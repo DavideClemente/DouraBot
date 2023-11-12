@@ -1,60 +1,64 @@
-from interactions import Client, Intents, listen, slash_command, slash_option, SlashContext, OptionType,  ComponentContext, component_callback
-from dotenv import load_dotenv
-from slash_commands.my_test import teste, test_button
-from interactions.api.voice.audio import AudioVolume
-import os
+import settings
+import discord
+from discord.ext import commands
+from logic.raffles import gifts_order, create_embed_gifts
+import asyncio
 
-load_dotenv()
-
-scope_list = [756505500178448505]
-
-bot = Client(intents=Intents.DEFAULT)
-# intents are what events we want to receive from discord, `DEFAULT` is usually fine
+logger = settings.logging.getLogger("bot")
 
 
-@listen()  # this decorator tells snek that it needs to listen for the corresponding event, and run this coroutine
-async def on_ready():
-    # This event is called when the bot is ready to respond to commands
-    print("Ready")
-    print(f"This bot is owned by {bot.owner}")
+def run_bot():
+    bot = commands.Bot(command_prefix='??', intents=discord.Intents.default())
+
+    @bot.event
+    async def on_ready():
+        logger.info(f'User: {bot.user} (ID: {bot.user.id})')
+        bot.tree.copy_global_to(guild=settings.DISCORD_GUILD)
+        await bot.tree.sync(guild=settings.DISCORD_GUILD)
+
+    @bot.tree.command()
+    async def secret_santa(interaction: discord.Interaction,
+                           person1: discord.Member = None,
+                           person2: discord.Member = None,
+                           person3: discord.Member = None,
+                           person4: discord.Member = None,
+                           person5: discord.Member = None,
+                           person6: discord.Member = None,
+                           person7: discord.Member = None,
+                           person8: discord.Member = None,
+                           person9: discord.Member = None,
+                           person10: discord.Member = None,
+                           person11: discord.Member = None,
+                           person12: discord.Member = None,
+                           person13: discord.Member = None,
+                           person14: discord.Member = None):
+        await interaction.response.defer()
+        persons_dict = locals().copy()
+        persons_dict.pop('interaction')
+        participants = [i for i in persons_dict.values() if i is not None]
+        list_order = gifts_order(participants)
+        descr = """
+            O jantar será dia 22 de dezembro
+            Orçamento da prendo cabe a cada um
+            Local a decidir
+            Esta é a que vale :)
+        """
+
+        for a, b in list_order:
+            try:
+                print(f'User a -> {str(a)}')
+                print(f'User b -> {str(b)}')
+                embed1 = create_embed_gifts("🎅 Secret Santa 🎅", descr, "🎄 Merry Christmas 🎄", a, b)
+                channel1 = await a.create_dm()
+                await channel1.send(embed=embed1)
+                await interaction.followup.send("Sent")
+            except Exception:
+                print(f"ERROR - > User a -> {str(a)}")
+                print(f"ERROR - > User a -> {str(b)}")
+                continue
+
+    bot.run(settings.DISCORD_TOKEN, root_logger=True)
 
 
-@slash_command(name="gay", description="Comando de teste :)", scopes=scope_list)
-async def my_command_function(ctx: SlashContext):
-    await ctx.send("Afonso is gay")
-
-
-@slash_command(name="teste", description="teste de options", scopes=scope_list)
-@slash_option(
-    name="integer_option",
-    description="Integer Option",
-    required=True,
-    opt_type=OptionType.INTEGER
-)
-async def teste_function(ctx: SlashContext, integer_option: int):
-    await teste(ctx, integer_option)
-
-
-@slash_command(name="buttons", description="teste de butoes", scopes=scope_list)
-async def teste_button(ctx: SlashContext):
-    await test_button(ctx)
-
-
-@component_callback("button_1")
-async def bt_callback(ctx: ComponentContext):
-    await ctx.send(f"You clicked it!")
-
-# @slash_command("play", description="play a song")
-# @slash_option("song",
-#               description="The song to play",
-#               opt_type=OptionType.STRING,
-#               required=True)
-# async def play(ctx: SlashContext, song: str):
-#     if not ctx.voice_state:
-#         await ctx.author.voice.channel.connect()
-
-#     audio = AudioVolume(song)
-#     await ctx.send(f'Now playing: ** {song} **')
-#     await ctx.voice_state.play(audio)
-
-bot.start(os.getenv("TOKEN"))
+if __name__ == '__main__':
+    run_bot()
