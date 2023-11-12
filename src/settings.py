@@ -10,6 +10,8 @@ DISCORD_TOKEN = os.getenv("TOKEN")
 
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))
 
+LOG_FILE_PATH = "../logs/infos.log"
+
 LOGGING_CONFIG = {
     "version": 1,
     "disabled_existing_loggers": False,
@@ -33,7 +35,7 @@ LOGGING_CONFIG = {
         "file": {
             "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": "../logs/infos.log",
+            "filename": LOG_FILE_PATH,
             "mode": "w",
             "formatter": "verbose",
         },

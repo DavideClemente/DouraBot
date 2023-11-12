@@ -26,6 +26,19 @@ def run_bot():
         await interaction.followup.send("Sent")
 
     @bot.tree.command()
+    async def show_logs(interaction: discord.Interaction, lines: int):
+        multiline_string = "############## LOGS ##############".center(100) + "\n"
+
+        #await interaction.response.defer()
+        with open(settings.LOG_FILE_PATH, "r") as file:
+
+            lines_list = file.readlines()
+
+            last_lines = lines_list[-lines:]
+            multiline_string += "'''" + "\n".join(last_lines) + "'''"
+        await interaction.response.send_message(multiline_string)
+
+    @bot.tree.command()
     async def secret_santa(interaction: discord.Interaction,
                            person1: discord.Member = None,
                            person2: discord.Member = None,
@@ -50,7 +63,7 @@ def run_bot():
             O jantar será dia 22 de dezembro
             Orçamento da prendo cabe a cada um
             Local - Almazem do edworld
-            Ignorem todas as mensagens anteriores.
+            Ignorem todas as mensagens anteriores. Isto não é um exercício
         """
 
         for a, b in list_order:
