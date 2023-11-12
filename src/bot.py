@@ -17,6 +17,15 @@ def run_bot():
         await bot.tree.sync(guild=settings.DISCORD_GUILD)
 
     @bot.tree.command()
+    async def test_message(interaction: discord.Interaction,
+                           person1: discord.Member = None,
+                           msg: str = ""):
+        await interaction.response.defer()
+        channel1 = await person1.create_dm()
+        await channel1.send(msg)
+        await interaction.followup.send("Sent")
+
+    @bot.tree.command()
     async def secret_santa(interaction: discord.Interaction,
                            person1: discord.Member = None,
                            person2: discord.Member = None,
@@ -40,22 +49,21 @@ def run_bot():
         descr = """
             O jantar será dia 22 de dezembro
             Orçamento da prendo cabe a cada um
-            Local a decidir
-            Esta é a que vale :)
+            Local - Almazem do edworld
+            Ignorem todas as mensagens anteriores.
         """
 
         for a, b in list_order:
             try:
-                print(f'User a -> {str(a)}')
-                print(f'User b -> {str(b)}')
-                embed1 = create_embed_gifts("🎅 Secret Santa 🎅", descr, "🎄 Merry Christmas 🎄", a, b)
-                channel1 = await a.create_dm()
-                await channel1.send(embed=embed1)
-                await interaction.followup.send("Sent")
+                embed = create_embed_gifts("🎅 Secret Santa 🎅", descr, "🎄 Merry Christmas 🎄", a, b)
+                channel = await a.create_dm()
+                await channel.send(embed=embed)
+                logger.info(f'Sent message for {str(a)}')
             except Exception:
-                print(f"ERROR - > User a -> {str(a)}")
-                print(f"ERROR - > User a -> {str(b)}")
+                logger.error(f'Error sending message to {a}')
                 continue
+        await interaction.followup.send("Sent messages. Check logs for possible errors")
+
 
     bot.run(settings.DISCORD_TOKEN, root_logger=True)
 

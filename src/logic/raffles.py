@@ -2,20 +2,17 @@ from itertools import permutations
 
 import discord
 from discord import Embed
-from random import randint
+from random import randint, shuffle
 
 
 def gifts_order(participants):
-    perms = list(permutations(participants))
-    index = randint(0, len(perms) - 1)
-
-    gift_order = list(perms[index])
+    shuffle(participants)
     lt = list()
 
-    lt.append((gift_order[len(gift_order) - 1], gift_order[0]))
+    lt.append((participants[len(participants) - 1], participants[0]))
     for i in range(0, len(participants) - 1):
-        a = gift_order[i]
-        b = gift_order[i + 1]
+        a = participants[i]
+        b = participants[i + 1]
         lt.append((a, b))
     return lt
 
