@@ -1,0 +1,12 @@
+FROM arm64v8/python as build
+
+COPY requirements.txt .
+
+RUN pip install -r requirements.txt
+
+# Final Stage
+FROM python:3.9
+COPY --from=build /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY . .
+
+CMD [ "python", "./src/bot.py" ]

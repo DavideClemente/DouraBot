@@ -1,8 +1,7 @@
 import settings
 import discord
 from discord.ext import commands
-from logic.raffles import gifts_order, create_embed_gifts
-import asyncio
+from logic.raffles import gifts_order
 from classes import secret_santa
 
 logger = settings.get_logger()
@@ -38,6 +37,7 @@ def run_bot():
         await interaction.response.send_message(msg)
 
     @bot.tree.command()
+    #@commands.has_any_role('DOURADINHO MESTRE', 'dev')
     async def show_logs(interaction: discord.Interaction, lines: int):
         '''Show the last n log lines'''
         multiline_string = "############## LOGS ##############".center(
@@ -48,6 +48,7 @@ def run_bot():
             last_lines = lines_list[-lines:]
             multiline_string += "'''" + "\n".join(last_lines) + "'''"
         await interaction.response.send_message(multiline_string)
+
 
     @bot.tree.command()
     async def secret_santa(interaction: discord.Interaction,
