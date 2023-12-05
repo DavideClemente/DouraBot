@@ -1,100 +1,27 @@
 import settings
 import discord
 from discord.ext import commands
-from logic.raffles import gifts_order
-from classes import secret_santa
-
-logger = settings.get_logger()
+from settings import ROLES
 
 
-class SecretSantaModal(discord.ui.Modal):
-    title = discord.ui.TextInput(
-        label="Title", style=discord.TextStyle.short, required=True)
-    description = discord.ui.TextInput(
-        label="Description", style=discord.TextStyle.paragraph, required=True)
+class Client(commands.Bot):
+    def __init__(self):
+        self.cogsList = ['cogs.xmas', 'cogs.admin']
+        self.logger = settings.get_logger()
+        super().__init__(command_prefix=commands.when_mentioned_or(
+            '??'), intents=discord.Intents().default())
 
+    async def on_ready(self):
+        self.logger.debug(f'User: {self.user} (ID: {self.user.id})')
+        self.tree.copy_global_to(guild=settings.DISCORD_GUILD)
+        synced = await self.tree.sync(guild=settings.DISCORD_GUILD)
+        self.logger.info(f'Synced {len(synced)} commands')
 
-def run_bot():
-    bot = commands.Bot(command_prefix='??', intents=discord.Intents.default())
-
-    @bot.event
-    async def on_ready():
-        logger.debug(f'User: {bot.user} (ID: {bot.user.id})')
-        bot.tree.copy_global_to(guild=settings.DISCORD_GUILD)
-        await bot.tree.sync(guild=settings.DISCORD_GUILD)
-
-    @bot.tree.command()
-    async def model(interaction: discord.Interaction):
-        modal = discord.M
-        await interaction.response.send_modal()
-
-    @bot.tree.command()
-    async def test_message(interaction: discord.Interaction,
-                           person1: discord.Member = None,
-                           msg: str = ""):
-        channel1 = await person1.create_dm()
-        await channel1.send(msg)
-        await interaction.response.send_message(msg)
-
-    @bot.tree.command()
-    #@commands.has_any_role('DOURADINHO MESTRE', 'dev')
-    async def show_logs(interaction: discord.Interaction, lines: int):
-        '''Show the last n log lines'''
-        multiline_string = "############## LOGS ##############".center(
-            100) + "\n"
-
-        with open(settings.LOG_FILE_PATH, "r") as file:
-            lines_list = file.readlines()
-            last_lines = lines_list[-lines:]
-            multiline_string += "'''" + "\n".join(last_lines) + "'''"
-        await interaction.response.send_message(multiline_string)
-
-
-    @bot.tree.command()
-    async def secret_santa(interaction: discord.Interaction,
-                           person1: discord.Member = None,
-                           person2: discord.Member = None,
-                           person3: discord.Member = None,
-                           person4: discord.Member = None,
-                           person5: discord.Member = None,
-                           person6: discord.Member = None,
-                           person7: discord.Member = None,
-                           person8: discord.Member = None,
-                           person9: discord.Member = None,
-                           person10: discord.Member = None,
-                           person11: discord.Member = None,
-                           person12: discord.Member = None,
-                           person13: discord.Member = None,
-                           person14: discord.Member = None):
-        '''Ho ho ho!! Who's gonna be your next secret santa? 🎅'''
-        await interaction.response.defer()
-        persons_dict = locals().copy()
-        persons_dict.pop('interaction')
-        participants = [i for i in persons_dict.values() if i is not None]
-        list_order = gifts_order(participants)
-        modal = SecretSantaModal()
-        await interaction.response.send_modal(modal)
-        descr = """
-            O jantar será dia 22 de dezembro
-            Orçamento da prendo cabe a cada um
-            Local - Almazem do edworld
-            Ignorem todas as mensagens anteriores. Isto não é um exercício
-        """
-
-        # for a, b in list_order:
-        #     try:
-        #         embed = create_embed_gifts(
-        #             "🎅 Secret Santa 🎅", descr, "🎄 Merry Christmas 🎄", a, b)
-        #         channel = await a.create_dm()
-        #         await channel.send(embed=embed)
-        #         logger.info(f'Sent message for {str(a)}')
-        #     except Exception:
-        #         logger.error(f'Error sending message to {a}')
-        #         continue
-        await interaction.followup.send("Sent messages. Check logs for possible errors")
-
-    bot.run(settings.DISCORD_TOKEN, root_logger=True)
+    async def setup_hook(self):
+        for ext in self.cogsList:
+            await self.load_extension(ext)
 
 
 if __name__ == '__main__':
-    run_bot()
+    client = Client()
+    client.run(settings.DISCORD_TOKEN, root_logger=True)

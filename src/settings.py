@@ -9,7 +9,13 @@ DISCORD_TOKEN = os.getenv("TOKEN")
 
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))
 
-LOG_FILE_PATH = "../logs/infos.log"
+LOG_FILE_PATH = "logs\infos.log"
+
+ROLES = {'DOURADINHO_GOD': 759023632051339264,
+         'DOURADINHO_MESTRE': 759023197004890152,
+         'DOURADINHO': 760530815456378981,
+         'DEV': 1171144045481959424
+         }
 
 logger = logging.getLogger(__name__)
 
@@ -25,5 +31,3 @@ logger.addHandler(file_handler)
 
 def get_logger():
     return logger
-
-
