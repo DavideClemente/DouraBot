@@ -4,7 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 from classes import secret_santa
 from settings import ROLES
-from logic.raffles import gifts_order, create_embed_gifts
+from .logic.raffles import gifts_order, create_embed_gifts
 
 logger = settings.get_logger()
 
