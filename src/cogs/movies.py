@@ -3,6 +3,7 @@ import settings
 from discord.ext import commands
 from discord import app_commands
 from settings import ROLES
+from .logic.utilities import rating_to_stars, is_role_allowed
 import sys
 import requests
 import json
@@ -36,74 +37,180 @@ class Movies(commands.Cog):
                     "image_large": "https://m.media-amazon.com/images/M/MV5BNGVjNWI4ZGUtNzE0MS00YTJmLWE0ZDctN2ZiYTk2YmI3NTYyXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
                     "api_path": "/title/tt7286456",
                     "imdb": "https://www.imdb.com/title/tt7286456"
+                }
+            ]
+        }
+
+        details = {
+            "id": "tt7286456",
+            "review_api_path": "/reviews/tt7286456",
+            "imdb": "https://www.imdb.com/title/tt7286456",
+            "contentType": "movie",
+            "contentRating": "R",
+            "isSeries": False,
+            "productionStatus": "released",
+            "isReleased": True,
+            "title": "Joker",
+            "image": "https://m.media-amazon.com/images/M/MV5BNGVjNWI4ZGUtNzE0MS00YTJmLWE0ZDctN2ZiYTk2YmI3NTYyXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+            "images": [
+                "https://m.media-amazon.com/images/M/MV5BY2MzMmRiZDQtMmQyMy00ODM3LTk1ZTYtNzYzYjliZTExY2YwXkEyXkFqcGdeQXVyNTM3MDMyMDQ@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BNDM2ZWYzZWItYTdiMS00ZGUzLWFkZTMtYWE3YzRkNGJmZDk1XkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BMDNkYTMzZjctYjg5YS00MDgwLTg2MGYtMWNmOWY3Nzg0ZDVlXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BMjk4Nzg5NjktMGMxMS00NjhjLThmNjItM2JjM2VjYjAwMjcyXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BYmZlOTY2OGUtYWY2Yy00NGE0LTg5YmQtNmM2MmYxOWI2YmJiXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BNmUzNDgwYjAtM2IyYS00ZTc3LWJjMDgtZTQ2MzA5N2IyMDZhXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BZDgzMzEzNDMtZThlNC00OTc3LWFlOGQtNGQ2ODFmYmNhOTA4XkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BODJmZTI4MmMtMTc5Mi00OTZlLWFiNDItMTNlZjQyMzUxMmQyXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BMjI0Nzk4ODctYWNlOC00Njg5LThiNTMtZDNjOTllODNlNWZlXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BOWM3ZDI1ZDAtYTZlZS00M2MzLWJhNTQtOWQxNmM5YmMzYjdiXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BZDJkOWFiM2QtYWExNS00YjQ3LTkyYTktMjllODBlY2UzMjQ2XkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BZGUzMWI4ZDktNTEzYi00ZmNiLThhNzItZDkwZDk2NTg5ZGNiXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg",
+                "https://m.media-amazon.com/images/M/MV5BYWQ4Mjk0Y2QtMDg0Mi00NWVjLWE2YmQtZmJjNGNmZThmMDQxXkEyXkFqcGdeQXVyMTkxNjUyNQ@@._V1_.jpg"
+            ],
+            "plot": "During the 1980s, a failed stand-up comedian is driven insane and turns to a life of crime and chaos in Gotham City while becoming an infamous psychopathic crime figure.",
+            "runtime": "2h 2m",
+            "runtimeSeconds": 7320,
+            "rating": {
+                "count": 1427201,
+                "star": 8.4
+            },
+            "award": {
+                "wins": 121,
+                "nominations": 239
+            },
+            "genre": [
+                "Crime",
+                "Drama",
+                "Thriller"
+            ],
+            "releaseDetailed": {
+                "date": "2019-10-04T00:00:00.000Z",
+                "day": 4,
+                "month": 10,
+                "year": 2019,
+                "releaseLocation": {
+                    "country": "United States",
+                    "cca2": "US"
+                },
+                "originLocations": [
+                    {
+                        "country": "United States",
+                        "cca2": "US"
+                    },
+                    {
+                        "country": "Canada",
+                        "cca2": "CA"
+                    }
+                ]
+            },
+            "year": 2019,
+            "spokenLanguages": [
+                {
+                    "language": "English",
+                    "id": "en"
                 },
                 {
-                    "id": "tt11315808",
-                    "title": "Joker: Folie à Deux",
-                    "year": 2024,
-                    "type": "movie",
-                    "image": "https://m.media-amazon.com/images/M/MV5BODUyODM1OGEtNTY3ZC00OTFjLTkyNDgtODU4MTk5NzkzYmQ5XkEyXkFqcGdeQXVyNjczMjc4NTA@._V1_UY396_CR6,0,258,396_AL_.jpg",
-                    "image_large": "https://m.media-amazon.com/images/M/MV5BODUyODM1OGEtNTY3ZC00OTFjLTkyNDgtODU4MTk5NzkzYmQ5XkEyXkFqcGdeQXVyNjczMjc4NTA@._V1_.jpg",
-                    "api_path": "/title/tt11315808",
-                    "imdb": "https://www.imdb.com/title/tt11315808"
+                    "language": "German",
+                    "id": "de"
+                }
+            ],
+            "filmingLocations": [
+                "1150 Anderson Ave, The Bronx, New York City, New York, USA"
+            ],
+            "actors": [
+                "Joaquin Phoenix",
+                "Robert De Niro",
+                "Zazie Beetz"
+            ],
+            "actors_v2": [
+                {
+                    "id": "nm0001618",
+                    "name": "Joaquin Phoenix"
                 },
                 {
-                    "id": "tt5611648",
-                    "title": "Joker",
-                    "year": 2016,
-                    "type": "movie",
-                    "image": "https://m.media-amazon.com/images/M/MV5BMTg3NzU5Mzg1MF5BMl5BanBnXkFtZTgwODIxMDg4MDI@._V1_UY396_CR6,0,289,396_AL_.jpg",
-                    "image_large": "https://m.media-amazon.com/images/M/MV5BMTg3NzU5Mzg1MF5BMl5BanBnXkFtZTgwODIxMDg4MDI@._V1_.jpg",
-                    "api_path": "/title/tt5611648",
-                    "imdb": "https://www.imdb.com/title/tt5611648"
+                    "id": "nm0000134",
+                    "name": "Robert De Niro"
                 },
                 {
-                    "id": "tt2548208",
-                    "title": "Poker Night",
-                    "year": 2014,
-                    "type": "movie",
-                    "image": "https://m.media-amazon.com/images/M/MV5BOTc5NjIyODM2M15BMl5BanBnXkFtZTgwMTMyNzE4MDE@._V1_UY396_CR6,0,267,396_AL_.jpg",
-                    "image_large": "https://m.media-amazon.com/images/M/MV5BOTc5NjIyODM2M15BMl5BanBnXkFtZTgwMTMyNzE4MDE@._V1_.jpg",
-                    "api_path": "/title/tt2548208",
-                    "imdb": "https://www.imdb.com/title/tt2548208"
+                    "id": "nm5939164",
+                    "name": "Zazie Beetz"
+                }
+            ],
+            "creators": [
+
+            ],
+            "creators_v2": [
+
+            ],
+            "directors": [
+                "Todd Phillips"
+            ],
+            "directors_v2": [
+                {
+                    "id": "nm0680846",
+                    "name": "Todd Phillips"
+                }
+            ],
+            "writers": [
+                "Todd Phillips",
+                "Scott Silver",
+                "Bob Kane"
+            ],
+            "writers_v2": [
+                {
+                    "id": "nm0680846",
+                    "name": "Todd Phillips"
                 },
                 {
-                    "id": "tt1918886",
-                    "title": "Joker",
-                    "year": 2012,
-                    "type": "movie",
-                    "image": "https://m.media-amazon.com/images/M/MV5BMjE0NjIxODMxN15BMl5BanBnXkFtZTcwMjM5MDcxOA@@._V1_UY396_CR6,0,296,396_AL_.jpg",
-                    "image_large": "https://m.media-amazon.com/images/M/MV5BMjE0NjIxODMxN15BMl5BanBnXkFtZTcwMjM5MDcxOA@@._V1_.jpg",
-                    "api_path": "/title/tt1918886",
-                    "imdb": "https://www.imdb.com/title/tt1918886"
+                    "id": "nm0798788",
+                    "name": "Scott Silver"
                 },
                 {
-                    "id": "tt13212978",
-                    "title": "Joker: Part II",
-                    "year": 2021,
-                    "type": "movie",
-                    "image": "https://m.media-amazon.com/images/M/MV5BNzY5YWY3N2QtNDVlYi00NmE5LTgyOGItMDE0YTQzMWM2NzVjXkEyXkFqcGdeQXVyNTUzNDMzOTY@._V1_UY396_CR6,0,297,396_AL_.jpg",
-                    "image_large": "https://m.media-amazon.com/images/M/MV5BNzY5YWY3N2QtNDVlYi00NmE5LTgyOGItMDE0YTQzMWM2NzVjXkEyXkFqcGdeQXVyNTUzNDMzOTY@._V1_.jpg",
-                    "api_path": "/title/tt13212978",
-                    "imdb": "https://www.imdb.com/title/tt13212978"
+                    "id": "nm0004170",
+                    "name": "Bob Kane"
+                }
+            ],
+            "top_credits": [
+                {
+                    "id": "director",
+                    "name": "Director",
+                    "credits": [
+                        "Todd Phillips"
+                    ]
                 },
                 {
-                    "id": "tt0102166",
-                    "title": "Joker",
-                    "year": 1991,
-                    "type": "movie",
-                    "image": "https://m.media-amazon.com/images/M/MV5BMDUzMjNjZWUtMjY5Ny00YjQ0LWEwYjgtMWYzOWU1MDdkOThhXkEyXkFqcGdeQXVyMjUyNDk2ODc@._V1_UY396_CR6,0,276,396_AL_.jpg",
-                    "image_large": "https://m.media-amazon.com/images/M/MV5BMDUzMjNjZWUtMjY5Ny00YjQ0LWEwYjgtMWYzOWU1MDdkOThhXkEyXkFqcGdeQXVyMjUyNDk2ODc@._V1_.jpg",
-                    "api_path": "/title/tt0102166",
-                    "imdb": "https://www.imdb.com/title/tt0102166"
+                    "id": "writer",
+                    "name": "Writers",
+                    "credits": [
+                        "Todd Phillips",
+                        "Scott Silver",
+                        "Bob Kane"
+                    ]
+                },
+                {
+                    "id": "cast",
+                    "name": "Stars",
+                    "credits": [
+                        "Joaquin Phoenix",
+                        "Robert De Niro",
+                        "Zazie Beetz"
+                    ]
                 }
             ]
         }
         result = response["results"][random.randint(
             0, len(response["results"]) - 1)]
+
+        description = f'''
+            Directors - {", ".join(details["directors"])}
+            Genres - {", ".join(details["genre"])}
+            Year - {details["year"]}
+            Rating - {rating_to_stars(details["rating"]["star"])} ({details["rating"]["star"]})
+        '''
+
         embed = discord.Embed(
             title=result['title'],
-            description=f'{result["title"]} - {result["year"]}',
+            description=description,
             url=result['imdb']
         )
         embed.set_image(url=result["image"])
