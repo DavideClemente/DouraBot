@@ -19,7 +19,7 @@ ROLES = {'DOURADINHO_GOD': 759023632051339264,
          'Lorita': 760530316955090976
          }
 
-IMDB_API = 'https://imdb-api.projects.thetuhin.com/'
+IMDB_API = os.getenv("CLOUDFLARE_WORKER")
 
 # Configure the root logger
 logging.basicConfig(level=logging.INFO,
