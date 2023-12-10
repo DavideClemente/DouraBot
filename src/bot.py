@@ -11,7 +11,7 @@ class Client(commands.Bot):
     def __init__(self):
         self.cogsList = ['cogs.xmas', 'cogs.admin']
         self.logger = logger
-        self.cogsFolder = 'src\cogs'
+        self.cogsFolder = os.path.join('.', 'src', 'cogs')
         super().__init__(command_prefix=commands.when_mentioned_or(
             '??'), intents=discord.Intents().default())
 

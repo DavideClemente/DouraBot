@@ -20,8 +20,8 @@ class admin(commands.Cog):
     #     return app_commands.check(predicate)
 
     @app_commands.command(name='show_logs', description='show recent bot logs')
-    # @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
-    @is_role_allowed(ROLES['Lorita'])
+    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
+    #@is_role_allowed(ROLES['Lorita'])
     async def show_logs(self, interaction: discord.Interaction, lines: int):
         '''Show the last n log lines'''
         self.logger.info(

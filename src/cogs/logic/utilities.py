@@ -13,3 +13,6 @@ def rating_to_stars(rating: float):
     half_star = int((rating % 2) != 0)
 
     return "⭐" * full_stars + ("½" if half_star else "")
+
+def ifNoneThenString(value):
+    return value if value is not None else ""

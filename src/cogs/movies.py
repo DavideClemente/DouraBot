@@ -3,7 +3,7 @@ import settings
 from discord.ext import commands
 from discord import app_commands, ChannelType
 from settings import ROLES, IMDB_API
-from .logic.utilities import rating_to_stars, is_role_allowed
+from .logic.utilities import rating_to_stars, is_role_allowed, ifNoneThenString
 import sys
 import requests
 import json
@@ -24,19 +24,19 @@ class Movies(commands.Cog):
             f'{IMDB_API}/title/{movie_id}').json()
 
         description = f'''
-                Directors - {", ".join(details["directors"])}
-                Genres - {", ".join(details["genre"])}
-                Year - {details["year"]}
-                Rating - {rating_to_stars(details["rating"]["star"])} ({details["rating"]["star"]})
-                Url - {result["imdb"]}
-            '''
+            Directors - {", ".join(details.get("directors", []))}
+            Genres - {", ".join(details.get("genre", []))}
+            Year - {details.get("year", "")}
+            Rating - {rating_to_stars(details.get("rating", {}).get("star", 0))} ({details.get("rating", {}).get("star", 0)})
+            Url - {result.get("imdb", "")}
+        '''
 
         embed = discord.Embed(
-            title=result['title'],
+            title=result.get('title', ''),
             description=description,
-            url=result['imdb']
+            url=result.get('imdb', '')
         )
-        embed.set_image(url=result["image"])
+        embed.set_image(url=result.get("image", ''))
         await thread.send(embed=embed)
 
     @app_commands.command(name='search_imdb', description='Search for a movie/series in imdb')
