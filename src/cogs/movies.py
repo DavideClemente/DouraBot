@@ -44,7 +44,7 @@ class Movies(commands.Cog):
                           title: str):
         ''''Search for a movie/series in imdb'''
         self.logger.info(
-            f'User {itr.user.display_name} called show_logs')
+            f'User {itr.user.display_name} called show_logs/{title}')
         await itr.response.defer()
 
         resp = requests.get(
@@ -53,15 +53,13 @@ class Movies(commands.Cog):
         if resp.status_code != 200:
             await itr.followup.send('Something went wrong!')
             return
-
+        
         json_res = resp.json()
-
+        await itr.followup.send(json_res["message"])
         channel = self.client.get_channel(itr.channel_id)
         thread = await channel.create_thread(
             name=f'Search Imdb "{title}"',
             type=ChannelType.public_thread)
-        await itr.followup.send(json_res["message"])
-       # await thread.send()
 
         for result in json_res["results"]:
             await self.sendResults(thread, result)
