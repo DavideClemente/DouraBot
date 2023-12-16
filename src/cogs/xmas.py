@@ -2,9 +2,9 @@ import discord
 import settings
 from discord.ext import commands
 from discord import app_commands
-from classes import secret_santa
 from settings import ROLES
 from .logic.raffles import gifts_order, create_embed_gifts
+from .logic.utilities import is_role_allowed
 
 logger = settings.get_logger()
 
@@ -13,21 +13,7 @@ class xmas(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
 
-    def is_role_allowed(self, *roles):
-        def predicate(inter: discord.Interaction):
-            return any(role in [r.id for r in inter.user.roles] for role in roles)
-        return app_commands.check(predicate)
-
-    @app_commands.command(name='test_message', description='send a message to someone')
-    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
-    async def test_message(self, interaction: discord.Interaction,
-                           person1: discord.Member = None,
-                           msg: str = ""):
-        channel1 = await person1.create_dm()
-        await channel1.send(msg)
-        await interaction.response.send_message(msg)
-
-    @app_commands.command(name='secret_santa', description='who will be your secret santa?')
+    @app_commands.command(name='secret_santa', description="Ho ho ho!! Who's gonna be your next secret santa? 🎅")
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'])
     async def secret_santa(self, interaction: discord.Interaction,
                            person1: discord.Member = None,
@@ -58,8 +44,11 @@ class xmas(commands.Cog):
             Local - Almazem do edworld
             Ignorem todas as mensagens anteriores. Isto não é um exercício
         """
+        await self.send_individual_messages(interaction, description, list_order)
+        await interaction.followup.send("Sent messages. Check logs for possible errors")
 
-        for a, b in list_order:
+    async def send_individual_messages(self, itr: discord.Interaction, description: str, list: list):
+        for a, b in list:
             try:
                 embed = create_embed_gifts(
                     "🎅 Secret Santa 🎅", description, "🎄 Merry Christmas 🎄", a, b)
@@ -69,11 +58,14 @@ class xmas(commands.Cog):
             except Exception:
                 logger.error(f'Error sending message to {a}')
                 continue
-        await interaction.followup.send("Sent messages. Check logs for possible errors")
+        await itr.followup.send("Sent messages. Check logs for possible errors")
 
-    # @secret_santa.error
-    # async def secret_santa(self, interaction: discord.Interaction, error):
-    #     await interaction.response.send_message('Not allowed!', ephemeral=True)
+    @secret_santa.error
+    async def secret_santa(self, interaction: discord.Interaction, error):
+        if isinstance(error, app_commands.CheckFailure):
+            self.logger.info(
+                f'User {interaction.user.display_name} tried calling show_logs')
+            await interaction.response.send_message('Not allowed!', ephemeral=True)
 
 
 async def setup(client: commands.Bot) -> None:

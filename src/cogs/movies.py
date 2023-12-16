@@ -18,7 +18,6 @@ class Movies(commands.Cog):
         self.logger = logger
 
     async def sendResults(self, thread: discord.Thread, result):
-        # result = json_res["results"][0]
         movie_id = result["id"]
         details = requests.get(
             f'{IMDB_API}/title/{movie_id}').json()
@@ -53,7 +52,7 @@ class Movies(commands.Cog):
         if resp.status_code != 200:
             await itr.followup.send('Something went wrong!')
             return
-        
+
         json_res = resp.json()
         await itr.followup.send(json_res["message"])
         channel = self.client.get_channel(itr.channel_id)

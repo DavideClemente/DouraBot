@@ -3,7 +3,6 @@ import discord
 from discord.ext import commands
 import sys
 import os
-
 logger = settings.get_logger()
 
 
