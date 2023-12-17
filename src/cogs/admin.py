@@ -3,8 +3,7 @@ import settings
 from discord.ext import commands
 from discord import app_commands
 from settings import ROLES
-import sys
-from .logic.utilities import is_role_allowed
+from logic.utilities import is_role_allowed
 
 
 logger = settings.get_logger()
@@ -21,7 +20,7 @@ class admin(commands.Cog):
 
     @app_commands.command(name='show_logs', description='show recent bot logs')
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
-    #@is_role_allowed(ROLES['Lorita'])
+    # @is_role_allowed(ROLES['Lorita'])
     async def show_logs(self, interaction: discord.Interaction, lines: int):
         '''Show the last n log lines'''
         self.logger.info(

@@ -24,8 +24,8 @@ def ifNoneThenString(value):
 def convert_to_datetime(date_str: str) -> datetime:
     try:
         # Attempt to parse the argument as a date
-        date_obj = datetime.strptime(date_str, '%Y-%m-%')
+        date_obj = datetime.strptime(date_str, '%m-%d')
         return date_obj
     except ValueError:
         # If parsing fails, raise an exception or handle the error accordingly
-        raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
+        raise ValueError("Invalid date format. Please use MM-DD.")

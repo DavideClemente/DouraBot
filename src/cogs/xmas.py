@@ -3,8 +3,8 @@ import settings
 from discord.ext import commands
 from discord import app_commands
 from settings import ROLES
-from .logic.raffles import gifts_order, create_embed_gifts
-from .logic.utilities import is_role_allowed
+from logic.raffles import gifts_order, create_embed_gifts
+from logic.utilities import is_role_allowed
 
 logger = settings.get_logger()
 

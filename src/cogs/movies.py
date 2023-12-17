@@ -2,12 +2,9 @@ import discord
 import settings
 from discord.ext import commands
 from discord import app_commands, ChannelType
-from settings import ROLES, IMDB_API
-from .logic.utilities import rating_to_stars, is_role_allowed, ifNoneThenString
-import sys
+from settings import IMDB_API
+from logic.utilities import rating_to_stars
 import requests
-import json
-import random
 
 logger = settings.get_logger()
 

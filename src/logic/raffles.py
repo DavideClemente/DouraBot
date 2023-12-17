@@ -3,6 +3,7 @@ from itertools import permutations
 import discord
 from discord import Embed
 from random import randint, shuffle
+from settings import DOURADINHOS_IMAGE
 
 
 def gifts_order(participants):
@@ -32,5 +33,5 @@ def create_embed_gifts(title: str, description: str, footer: str, a: str, b: str
     embed.set_author(name="DouraBot")
     embed.set_footer(text=footer)
     embed.set_thumbnail(
-        url='https://www.nit.pt/wp-content/uploads/2016/10/ed3647fa-e8e1-47da-984f-4f166d66fa1c-754x394.jpg')
+        url=DOURADINHOS_IMAGE)
     return embed

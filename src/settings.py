@@ -6,11 +6,23 @@ from logging.handlers import TimedRotatingFileHandler
 
 load_dotenv()
 
-DISCORD_TOKEN = os.getenv("TOKEN")
-
+# CONSTANTS
+ENVIRONMENT = os.getenv("ENVIRONMENT")
+DISCORD_TOKEN = os.getenv(
+    "TOKEN_DEV") if ENVIRONMENT == 'DEV' else os.getenv("TOKEN_PROD")
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))
 
-LOG_FILE_PATH = "logs\logs.log"
+DOURADINHOS_IMAGE = 'https://www.nit.pt/wp-content/uploads/2016/10/ed3647fa-e8e1-47da-984f-4f166d66fa1c-754x394.jpg'
+
+# CHANNEL IDS
+GENERAL_CHANNEL = 756505500677308486
+PRIVATE_DOURA_CHANNEL = 860682465185234944
+DEV_CHANNEL = 1171143985595686983
+
+# PATHS
+LOG_FILE_PATH = os.path.join('.', 'logs', 'logs.log')
+COGS_PATH = os.path.join('src', 'cogs')
+DB_FILE_PATH = os.path.join('db', 'localdb.db')
 
 ROLES = {'DOURADINHO_GOD': 759023632051339264,
          'DOURADINHO_MESTRE': 759023197004890152,
