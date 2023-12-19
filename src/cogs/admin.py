@@ -22,7 +22,12 @@ class admin(commands.Cog):
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
     # @is_role_allowed(ROLES['Lorita'])
     async def show_logs(self, interaction: discord.Interaction, lines: int):
-        '''Show the last n log lines'''
+        """Shows the last lines of logs
+
+        Args:
+            interaction (discord.Interaction): _description_
+            lines (int): Number of lines you want to retrieve
+        """
         self.logger.info(
             f'User {interaction.user.display_name} called show_logs')
         await interaction.response.defer()

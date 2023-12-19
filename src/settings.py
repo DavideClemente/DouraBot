@@ -7,9 +7,11 @@ from logging.handlers import TimedRotatingFileHandler
 load_dotenv()
 
 # CONSTANTS
+
 ENVIRONMENT = os.getenv("ENVIRONMENT")
+IS_DEV = True if ENVIRONMENT == 'DEV' else False
 DISCORD_TOKEN = os.getenv(
-    "TOKEN_DEV") if ENVIRONMENT == 'DEV' else os.getenv("TOKEN_PROD")
+    "TOKEN_DEV") if IS_DEV else os.getenv("TOKEN_PROD")
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))
 
 DOURADINHOS_IMAGE = 'https://www.nit.pt/wp-content/uploads/2016/10/ed3647fa-e8e1-47da-984f-4f166d66fa1c-754x394.jpg'
@@ -23,6 +25,7 @@ DEV_CHANNEL = 1171143985595686983
 LOG_FILE_PATH = os.path.join('.', 'logs', 'logs.log')
 COGS_PATH = os.path.join('src', 'cogs')
 DB_FILE_PATH = os.path.join('db', 'localdb.db')
+DOCKER_VOLUME_PATH = '/var/lib/mysql-dourabot'
 
 ROLES = {'DOURADINHO_GOD': 759023632051339264,
          'DOURADINHO_MESTRE': 759023197004890152,

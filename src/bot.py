@@ -3,8 +3,8 @@ import discord
 from discord.ext import commands
 import sys
 import os
-from sqlite_database import Database, text, integer
 import sqlite3
+from database import DatabaseManager
 logger = settings.get_logger()
 
 
@@ -12,9 +12,10 @@ class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
-        self.db = sqlite3.connect(settings.DB_FILE_PATH)
-        # self.db = Database(settings.DB_FILE_PATH)
-        self.setup_db()
+        if settings.IS_DEV:
+            self.db = DatabaseManager().connect(settings.DB_FILE_PATH)
+        else:
+            self.db = DatabaseManager().connect(settings.DOCKER_VOLUME_PATH)
         super().__init__(command_prefix=commands.when_mentioned_or(
             '??'), intents=discord.Intents().default())
 
@@ -22,32 +23,32 @@ class Client(commands.Bot):
         self.logger.info(f'User: {self.user} (ID: {self.user.id})')
         self.tree.copy_global_to(guild=settings.DISCORD_GUILD)
         synced = await self.tree.sync(guild=settings.DISCORD_GUILD)
-        self.logger.info(f'Synced {len(synced)} commands')
+        self.logger.info(
+            f'Synced {len(synced)} commands: {[s.name for s in synced]}')
 
     async def setup_hook(self):
+        skips = []
         for filename in os.listdir(self.cogsFolder):
             cog_path = os.path.join(self.cogsFolder, filename)
             # Skip directories
             if os.path.isdir(cog_path):
                 continue
+            if filename[:-3] in skips:
+                continue
+            self.logger.info(f'Loaded {filename} cog')
             await self.load_extension(f'cogs.{filename[:-3]}')
 
     async def on_disconnect(self):
         self.logger.info(f'Bot disconnected from Discord')
-        self.db.close()
 
     async def on_connect(self):
         self.logger.info(f'Bot connected to Discord')
-        self.db = Database(settings.DB_FILE_PATH)
 
     def setup_db(self):
         try:
             with self.db:
                 self.db.execute(
                     'CREATE TABLE BIRTHDAYS(USER_ID INTEGER PRIMARY KEY, USERNAME TEXT NOT NULL, BIRTH_DATE TEXT NOT NULL)')
-            # cur = self.db.cursor()
-            # cur.execute(
-            #     'CREATE TABLE BIRTHDAYS(USER_ID INTEGER PRIMARY KEY, USERNAME TEXT NOT NULL, BIRTH_DATE TEXT NOT NULL)')
         except Exception as e:
             self.logger.info(e)
 
@@ -60,7 +61,8 @@ def log_unhandled_exception(exc_type, exc_value, exc_traceback):
                  exc_info=(exc_type, exc_value, exc_traceback))
 
 
-# sys.excepthook = log_unhandled_exception
+if settings.ENVIRONMENT == 'PROD':
+    sys.excepthook = log_unhandled_exception
 
 if __name__ == '__main__':
     client = Client()
