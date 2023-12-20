@@ -13,7 +13,7 @@ class DatabaseManager:
     def connect(self, filePath):
         self.db: sqlite3 = sqlite3.connect(filePath)
 
-    def get_connection(self):
+    def get_connection(self) -> sqlite3:
         if not self.db:
             raise ValueError('Database connection not established')
         return self.db

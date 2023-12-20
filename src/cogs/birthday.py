@@ -73,8 +73,29 @@ class Birthday(commands.Cog):
         except Exception as e:
             await itr.followup.send(f'Error while adding birthday - {e}', ephemeral=True)
 
-    async def edit_birthday(self, itr: discord.Interaction, who: discord.Member, newBirthday: str):
-        await itr.response.send_message('Not implemented yet!')
+    @app_commands.command(name='edit_birthday', description="Edit someone's birthday date")
+    async def edit_birthday(self, itr: discord.Interaction, who: discord.Member, new_birthday: str):
+        """Edit someone's birthday date
+
+        Args:
+            itr (discord.Interaction): _description_
+            who (discord.Member): Person to edit birthday
+            newBirthday (str): New birthday
+        """
+        try:
+            with self.db:
+                birthday = self.db.execute(
+                    "SELECT * FROM BIRTHDAYS WHERE USER_ID = ?", (who.id,)).fetchone()
+                if birthday is None:
+                    await itr.response.send_message(f'No birthday registered for {who.display_name}')
+                else:
+                    converted_birthday_date = convert_to_datetime(
+                        new_birthday).strftime("%m-%d")
+                    self.db.execute("UPDATE BIRTHDAYS SET BIRTH_DATE = ? WHERE USER_ID = ?",
+                                    (converted_birthday_date, who.id,))
+                    await itr.response.send_message(f"Edited {who.display_name}'s birthday")
+        except Exception as e:
+            await itr.response.send(f'Error while editing birthday - {e}', ephemeral=True)
 
 
 async def setup(client: commands.Bot) -> None:
