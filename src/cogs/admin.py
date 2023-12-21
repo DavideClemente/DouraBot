@@ -6,21 +6,13 @@ from settings import ROLES
 from logic.utilities import is_role_allowed
 
 
-logger = settings.get_logger()
-
-
 class admin(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
-        self.logger = logger
-    # def is_role_allowed(self, *roles):
-    #     def predicate(inter: discord.Interaction):
-    #         return any(role in [r.id for r in inter.user.roles] for role in roles)
-    #     return app_commands.check(predicate)
+        self.logger = settings.get_logger()
 
     @app_commands.command(name='show_logs', description='show recent bot logs')
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
-    # @is_role_allowed(ROLES['Lorita'])
     async def show_logs(self, interaction: discord.Interaction, lines: int):
         """Shows the last lines of logs
 

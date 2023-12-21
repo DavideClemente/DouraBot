@@ -35,6 +35,7 @@ ROLES = {'DOURADINHO_GOD': 759023632051339264,
          }
 
 IMDB_API = os.getenv("CLOUDFLARE_WORKER")
+CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={os.getenv("CURRENCY_API_KEY")}'
 
 # Configure the root logger
 logging.basicConfig(level=logging.INFO,

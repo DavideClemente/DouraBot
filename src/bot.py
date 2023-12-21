@@ -35,6 +35,8 @@ class Client(commands.Bot):
                 continue
             if filename[:-3] in skips:
                 continue
+            if filename[-3:] != '.py':
+                continue
             self.logger.info(f'Loaded {filename} cog')
             await self.load_extension(f'cogs.{filename[:-3]}')
 
