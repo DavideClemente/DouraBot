@@ -25,6 +25,8 @@ class Currency(commands.Cog):
             currency2 (str): Currency to convert to
             amount (float): Amount to be converted
         """
+        currency1 = currency1.upper()
+        currency2 = currency2.upper()
         if currency1 not in self.currencies:
             await itr.response.send_message(f'{currency1} is not supported!', ephemeral=True)
 
@@ -36,7 +38,7 @@ class Currency(commands.Cog):
 
         if (api_response_json['data'] is not None):
             data = api_response_json['data']
-            await itr.response.send_message(f'Result: {amount} {currency1} => {round(amount * float(data[currency2]), 2)} {currency2}')
+            await itr.response.send_message(f'🪙 Result: {amount} {currency1} => {round(amount * float(data[currency2]), 2)} {currency2} 🪙')
         else:
             await itr.response.send_message('Error while performing conversion', ephemeral=True)
 
