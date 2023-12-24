@@ -6,6 +6,7 @@ RUN pip install -r requirements.txt
 
 COPY ./src ./src
 COPY ./db ./db
+COPY ./logs ./logs
 COPY .env .
 
 CMD [ "python", "./src/bot.py" ]

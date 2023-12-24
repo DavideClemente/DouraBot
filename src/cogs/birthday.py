@@ -1,11 +1,10 @@
 import sqlite3
 import discord
-import settings
 from discord.ext import commands, tasks
 from discord import app_commands
-import settings
+from settings import *
 from datetime import datetime
-from logic.utilities import convert_to_datetime
+from logic.utilities import convert_to_datetime, is_role_allowed
 from database import DatabaseManager
 
 
@@ -13,12 +12,12 @@ class Birthday(commands.Cog):
 
     def __init__(self, client: commands.Bot):
         self.client = client
-        self.logger = settings.get_logger()
+        self.logger = get_logger()
         self.db = DatabaseManager().get_connection()
-        # self.check_birthdays.start()
+        self.check_birthdays.start()
 
-    # def cog_unload(self):
-    #     self.check_birthdays.stop()
+    def cog_unload(self):
+        self.check_birthdays.stop()
 
     def create_embed(self, user: discord.User):
         embed = discord.Embed(
@@ -26,18 +25,16 @@ class Birthday(commands.Cog):
         embed.set_author(name="DouraBot")
         embed.set_image(url=user.avatar.url)
         embed.set_thumbnail(
-            url=settings.DOURADINHOS_IMAGE)
+            url=DOURADINHOS_IMAGE)
         return embed
 
-    # @tasks.loop(hours=24)
-    @app_commands.command(name='check_birthdays', description='add someones birthday')
-    async def check_birthdays(self, itr: discord.Interaction):
-        channel = self.client.get_channel(settings.DEV_CHANNEL)
+    @tasks.loop(hours=24)
+    # @app_commands.command(name='check_birthdays', description='add someones birthday')
+    async def check_birthdays(self):
+        channel = self.client.get_channel(DEV_CHANNEL)
         today_date = datetime.utcnow().strftime("%m-%d")
         birthdays = self.db.execute(
             'SELECT USER_ID, BIRTH_DATE FROM BIRTHDAYS WHERE BIRTH_DATE = ?', (today_date,)).fetchall()
-        if len(birthdays) == 0:
-            await itr.response.send_message('No birthdays')
         for userId, _ in birthdays:
             discord_user: discord.User = await self.client.fetch_user(
                 userId)
@@ -96,6 +93,22 @@ class Birthday(commands.Cog):
                     await itr.response.send_message(f"Edited {who.display_name}'s birthday")
         except Exception as e:
             await itr.response.send(f'Error while editing birthday - {e}', ephemeral=True)
+
+    @app_commands.command(name='list_birthdays', description="List birthdays in db")
+    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
+    async def list_birthdays(self, itr: discord.Interaction):
+        await itr.response.defer()
+        try:
+            with self.db:
+                birthdays = self.db.execute(
+                    "SELECT * FROM BIRTHDAYS").fetchall()
+                if len(birthdays) == 0:
+                    await itr.followup.send('No birthdays found!')
+                else:
+                    ids, names, dates = zip(*birthdays)
+                    await itr.followup.send("\n".join([f"{value1} - {value2} - {value3}" for value1, value2, value3 in zip(ids, names, dates)]))
+        except Exception as e:
+            await itr.followup.send(f'Error while fetching birthday - {e}', ephemeral=True)
 
 
 async def setup(client: commands.Bot) -> None:

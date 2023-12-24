@@ -12,10 +12,10 @@ class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
-        if settings.IS_DEV:
-            self.db = DatabaseManager().connect(settings.DB_FILE_PATH)
-        else:
+        if settings.USE_DOCKER_VOLUME:
             self.db = DatabaseManager().connect(settings.DOCKER_VOLUME_PATH)
+        else:
+            self.db = DatabaseManager().connect(settings.DB_FILE_PATH)
         super().__init__(command_prefix=commands.when_mentioned_or(
             '??'), intents=discord.Intents().default())
 
@@ -45,14 +45,6 @@ class Client(commands.Bot):
 
     async def on_connect(self):
         self.logger.info(f'Bot connected to Discord')
-
-    def setup_db(self):
-        try:
-            with self.db:
-                self.db.execute(
-                    'CREATE TABLE BIRTHDAYS(USER_ID INTEGER PRIMARY KEY, USERNAME TEXT NOT NULL, BIRTH_DATE TEXT NOT NULL)')
-        except Exception as e:
-            self.logger.info(e)
 
 
 def log_unhandled_exception(exc_type, exc_value, exc_traceback):
