@@ -56,7 +56,7 @@ class admin(commands.Cog):
         embed.set_author(name='DouraBot', icon_url=DOURADINHOS_AVATAR)
         if thumbnail != None:
             embed.set_thumbnail(url=thumbnail)
-        await channel.send(embed=embed)
+        await channel.send(content="@everyone", embed=embed)
         await itr.response.send_message('Announcement made!')
 
 
