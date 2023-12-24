@@ -1,8 +1,9 @@
+import dis
 import discord
 import settings
 from discord.ext import commands
 from discord import app_commands
-from settings import ROLES
+from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES
 from logic.utilities import is_role_allowed
 
 
@@ -37,6 +38,26 @@ class admin(commands.Cog):
             self.logger.info(
                 f'User {interaction.user.display_name} tried calling show_logs')
             await interaction.response.send_message('Not allowed!', ephemeral=True)
+
+    @app_commands.command(name='announce', description='announce a message to the server')
+    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'])
+    async def announce(self, itr: discord.Interaction, channel: discord.TextChannel, title: str, msg: str, thumbnail: str = None):
+        """Announce a message to the server
+
+        Args:
+            itr (discord.Interaction): _description_
+            title (str): Announcement title
+            msg (str): Announcement description
+            thumbnail (str, optional): Thumbnail url. Defaults to None.
+        """
+        self.logger.info(
+            f'{itr.user.display_name} announced: Title - {title} | Message - {msg}')
+        embed = discord.Embed(title=title, description=msg)
+        embed.set_author(name='DouraBot', icon_url=DOURADINHOS_AVATAR)
+        if thumbnail != None:
+            embed.set_thumbnail(url=thumbnail)
+        await channel.send(embed=embed)
+        await itr.response.send_message('Announcement made!')
 
 
 async def setup(client: commands.Bot) -> None:
