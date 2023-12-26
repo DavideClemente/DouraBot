@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="DouraBotLocal" uuid="590d0f3d-fe49-48da-94ae-e575cd81f196">
-      <driver-ref>mysql.8</driver-ref>
+    <data-source source="LOCAL" name="DouraBot" uuid="5bd1d924-6a96-4e5f-af26-5ebc348c1d7c">
+      <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
-      <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>
-      <jdbc-url>jdbc:mysql://127.0.0.1:3306</jdbc-url>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:C:\Users\Davide\Documents\Stuff\Projetos\GitHub\DouraBot\db\localdb.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>

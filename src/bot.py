@@ -60,4 +60,4 @@ if settings.ENVIRONMENT == 'PROD':
 
 if __name__ == '__main__':
     client = Client()
-    client.run(settings.DISCORD_TOKEN, root_logger=True)
+    client.run(settings.DISCORD_TOKEN, log_handler=settings.get_handler())

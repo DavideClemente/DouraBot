@@ -26,18 +26,18 @@ DEV_CHANNEL = 1171143985595686983
 LOG_FILE_PATH = os.path.join('logs', 'logs.log')
 COGS_PATH = os.path.join('src', 'cogs')
 DB_FILE_PATH = os.path.join('db', 'localdb.db')
-DOCKER_VOLUME_PATH = '/var/lib/dourabot'
+DOCKER_VOLUME_PATH = '/data'
 
 ROLES = {'DOURADINHO_GOD': 759023632051339264,
          'DOURADINHO_MESTRE': 759023197004890152,
          'DOURADINHO': 760530815456378981,
+         'DOURA_HONORARIO': 882416521584975882,
          'DEV': 1171144045481959424,
          'Lorita': 760530316955090976
          }
 
 IMDB_API = os.getenv("CLOUDFLARE_WORKER")
-CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={
-    os.getenv("CURRENCY_API_KEY")}'
+CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={os.getenv("CURRENCY_API_KEY")}'
 # Configure the root logger
 print(LOG_FILE_PATH)
 print(os.listdir(os.path.curdir))
@@ -52,6 +52,10 @@ handler = TimedRotatingFileHandler(filename=LOG_FILE_PATH,
                                    interval=4,
                                    backupCount=6)
 logger.addHandler(handler)
+
+
+def get_handler():
+    return handler
 
 
 def get_logger():

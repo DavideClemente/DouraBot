@@ -14,13 +14,10 @@ class admin(commands.Cog):
 
     @app_commands.command(name='show_logs', description='show recent bot logs')
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
-    async def show_logs(self, interaction: discord.Interaction, lines: int):
+    async def show_logs(self, interaction: discord.Interaction):
         """Shows the last lines of logs
-
-        Args:
-            interaction (discord.Interaction): _description_
-            lines (int): Number of lines you want to retrieve
         """
+        lines = 10
         self.logger.info(
             f'User {interaction.user.display_name} called show_logs')
         await interaction.response.defer()
@@ -40,7 +37,7 @@ class admin(commands.Cog):
             await interaction.response.send_message('Not allowed!', ephemeral=True)
 
     @app_commands.command(name='announce', description='announce a message to the server')
-    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'])
+    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DOURADINHO'], ROLES['DOURA_HONORARIO'])
     async def announce(self, itr: discord.Interaction, channel: discord.TextChannel, title: str, msg: str, thumbnail: str = None):
         """Announce a message to the server
 

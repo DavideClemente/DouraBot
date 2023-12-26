@@ -18,7 +18,7 @@ class DatabaseManager:
         try:
             with self.db:
                 self.db.execute(
-                    'CREATE TABLE BIRTHDAYS(USER_ID INTEGER PRIMARY KEY, USERNAME TEXT NOT NULL UNIQUE, BIRTH_DATE TEXT NOT NULL)')
+                    'CREATE TABLE IF NOT EXISTS BIRTHDAYS(USER_ID INTEGER PRIMARY KEY, USERNAME TEXT NOT NULL UNIQUE, BIRTH_DATE TEXT NOT NULL)')
         except Exception as e:
             logger.info(e)
 

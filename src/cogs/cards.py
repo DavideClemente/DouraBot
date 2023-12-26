@@ -1,0 +1,74 @@
+import io
+import discord
+from discord.interactions import Interaction
+from database import DatabaseManager
+from discord.ext import commands
+from discord import app_commands
+from settings import get_logger
+import uuid
+
+
+class GameDropDown(discord.ui.Select):
+    def __init__(self, db):
+        self.db = db
+        options = [
+            discord.SelectOption(
+                label="So...", description="52 questions, unlimited conversation"),
+            discord.SelectOption(label="Not implemented",
+                                 description="Not implemented")
+        ]
+        super().__init__(placeholder="Dropdown menu",
+                         min_values=1, max_values=1, options=options)
+
+    async def callback(self, itr: Interaction):
+        await itr.response.defer()
+        if self.values[0] == "So...":
+            await itr.followup.send(file=await self.draw_card('So...'))
+        else:
+            await itr.followup.send_message(f'Not implemented')
+
+    async def draw_card(self, gameQuery):
+        with self.db as db:
+            id, game, byte_array = db.execute(
+                "SELECT * FROM CARDS WHERE game = ? ORDER BY RANDOM()", (gameQuery,)).fetchone()
+            return discord.File(fp=io.BytesIO(
+                byte_array), filename='image.jpg')
+
+
+class GameView(discord.ui.View):
+    def __init__(self, db):
+        super().__init__()
+        self.add_item(GameDropDown(db))
+
+
+class Cards(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+        self.logger = get_logger()
+        self.db = DatabaseManager().get_connection()
+        # self.insert_image()
+
+    @app_commands.command(name='send_image', description="List birthdays in db")
+    async def send_image(self, itr: discord.Interaction):
+        await itr.response.defer()
+        with self.db as db:
+            id, game, byte_array = db.execute("SELECT * FROM CARDS").fetchone()
+            file = discord.File(fp=io.BytesIO(
+                byte_array), filename='ferrari.jpg')
+            await itr.followup.send("Successfull", file=file)
+
+    @app_commands.command(name="draw_card", description="Draw a card of a game of your choice")
+    async def draw_card(self, itr: discord.Interaction):
+        await itr.response.send_message(content="Choose the game", view=GameView(self.db))
+
+    def insert_image(self):
+        with open("ferrari.jpg", "rb") as image:
+            file = image.read()
+            byte_array = bytearray(file)
+            with self.db:
+                self.db.execute("INSERT INTO CARDS VALUES (?,?,?)",
+                                (str(uuid.uuid4()), 'So...', byte_array))
+
+
+async def setup(client: commands.Bot) -> None:
+    await client.add_cog(Cards(client))
