@@ -1,0 +1,4 @@
+{
+    "python.analysis.extraPaths": ["./src/logic", "./src/cogs"],
+    "python.analysis.autoImportCompletions": true
+}

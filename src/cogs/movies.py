@@ -2,12 +2,9 @@ import discord
 import settings
 from discord.ext import commands
 from discord import app_commands, ChannelType
-from settings import ROLES, IMDB_API
-from .logic.utilities import rating_to_stars, is_role_allowed, ifNoneThenString
-import sys
+from settings import IMDB_API
+from logic.utilities import rating_to_stars
 import requests
-import json
-import random
 
 logger = settings.get_logger()
 
@@ -17,9 +14,14 @@ class Movies(commands.Cog):
         self.client = client
         self.logger = logger
 
-    async def sendResults(self, thread: discord.Thread, result):
-        # result = json_res["results"][0]
-        movie_id = result["id"]
+    async def sendResults(self, thread: discord.Thread, imdb_data: dict):
+        """Sends the results back to the server via a thread
+
+        Args:
+            thread (discord.Thread): Thread to send results to
+            imdb_data (dict): Data from imdb
+        """
+        movie_id = imdb_data["id"]
         details = requests.get(
             f'{IMDB_API}/title/{movie_id}').json()
 
@@ -28,21 +30,26 @@ class Movies(commands.Cog):
             Genres - {", ".join(details.get("genre", []))}
             Year - {details.get("year", "")}
             Rating - {rating_to_stars(details.get("rating", {}).get("star", 0))} ({details.get("rating", {}).get("star", 0)})
-            Url - {result.get("imdb", "")}
+            Url - {imdb_data.get("imdb", "")}
         '''
 
         embed = discord.Embed(
-            title=result.get('title', ''),
+            title=imdb_data.get('title', ''),
             description=description,
-            url=result.get('imdb', '')
+            url=imdb_data.get('imdb', '')
         )
-        embed.set_image(url=result.get("image", ''))
+        embed.set_image(url=imdb_data.get("image", ''))
         await thread.send(embed=embed)
 
     @app_commands.command(name='search_imdb', description='Search for a movie/series in imdb')
     async def search_imdb(self, itr: discord.Interaction,
                           title: str):
-        ''''Search for a movie/series in imdb'''
+        """Search for a movie/series in imdb
+
+        Args:
+            itr (discord.Interaction): _description_
+            title (str): Movie/Series title
+        """
         self.logger.info(
             f'User {itr.user.display_name} called show_logs/{title}')
         await itr.response.defer()
@@ -53,7 +60,7 @@ class Movies(commands.Cog):
         if resp.status_code != 200:
             await itr.followup.send('Something went wrong!')
             return
-        
+
         json_res = resp.json()
         await itr.followup.send(json_res["message"])
         channel = self.client.get_channel(itr.channel_id)
