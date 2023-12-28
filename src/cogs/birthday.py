@@ -33,8 +33,10 @@ class Birthday(commands.Cog):
     async def check_birthdays(self):
         channel = self.client.get_channel(DEV_CHANNEL)
         today_date = datetime.utcnow().strftime("%m-%d")
-        birthdays = self.db.execute(
-            'SELECT USER_ID, BIRTH_DATE FROM BIRTHDAYS WHERE BIRTH_DATE = ?', (today_date,)).fetchall()
+        cursor = self.db.cursor()
+        cursor.execute(
+            'SELECT USER_ID, BIRTH_DATE FROM BIRTHDAYS WHERE BIRTH_DATE = %s', (today_date))
+        birthdays = cursor.fetchall()
         for userId, _ in birthdays:
             discord_user: discord.User = await self.client.fetch_user(
                 userId)
@@ -60,9 +62,10 @@ class Birthday(commands.Cog):
         except ValueError as ex:
             await itr.followup.send(ex, ephemeral=True)
         try:
-            with self.db:
-                self.db.execute('INSERT INTO BIRTHDAYS VALUES(?,?,?)',
-                                (who.id, who.display_name, converted_birthday_date))
+            with self.db.cursor() as cursor:
+                cursor.execute('INSERT INTO BIRTHDAYS VALUES(%s,%s,%s)',
+                               (who.id, who.display_name, converted_birthday_date))
+                self.db.commit()
             self.logger.info(f"Registered {who.name}'s birthday")
             await itr.followup.send(f"Registered {who.display_name}'s birthday", ephemeral=True)
         except sqlite3.IntegrityError:
@@ -80,16 +83,19 @@ class Birthday(commands.Cog):
             newBirthday (str): New birthday
         """
         try:
-            with self.db:
-                birthday = self.db.execute(
-                    "SELECT * FROM BIRTHDAYS WHERE USER_ID = ?", (who.id,)).fetchone()
+            with self.db.cursor() as cursor:
+                cursor.execute(
+                    "SELECT * FROM BIRTHDAYS WHERE USER_ID = %s", (who.id))
+                birthday = cursor.fetchone()
+                self.db.commit()
                 if birthday is None:
                     await itr.response.send_message(f'No birthday registered for {who.display_name}')
                 else:
                     converted_birthday_date = convert_to_datetime(
                         new_birthday).strftime("%m-%d")
-                    self.db.execute("UPDATE BIRTHDAYS SET BIRTH_DATE = ? WHERE USER_ID = ?",
-                                    (converted_birthday_date, who.id,))
+                    cursor.execute("UPDATE BIRTHDAYS SET BIRTH_DATE = %s WHERE USER_ID = %s",
+                                   (converted_birthday_date, who.id))
+                    self.db.commit()
                     await itr.response.send_message(f"Edited {who.display_name}'s birthday")
         except Exception as e:
             await itr.response.send(f'Error while editing birthday - {e}', ephemeral=True)
@@ -99,9 +105,12 @@ class Birthday(commands.Cog):
     async def list_birthdays(self, itr: discord.Interaction):
         await itr.response.defer()
         try:
-            with self.db:
-                birthdays = self.db.execute(
-                    "SELECT * FROM BIRTHDAYS").fetchall()
+            with self.db as db:
+                cursor = db.cursor()
+                cursor.execute(
+                    "SELECT * FROM BIRTHDAYS;")
+                birthdays = cursor.fetchall()
+                self.db.commit()
                 if len(birthdays) == 0:
                     await itr.followup.send('No birthdays found!')
                 else:

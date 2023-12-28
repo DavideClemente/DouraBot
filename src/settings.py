@@ -9,7 +9,6 @@ load_dotenv()
 # CONSTANTS
 ENVIRONMENT = os.getenv("ENVIRONMENT")
 IS_DEV = True if ENVIRONMENT == 'DEV' else False
-USE_DOCKER_VOLUME = True if os.getenv("USE_DOCKER_VOLUME") == 'True' else False
 DISCORD_TOKEN = os.getenv(
     "TOKEN_DEV") if IS_DEV else os.getenv("TOKEN_PROD")
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))

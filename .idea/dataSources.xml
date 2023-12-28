@@ -8,5 +8,19 @@
       <jdbc-url>jdbc:sqlite:C:\Users\Davide\Documents\Stuff\Projetos\GitHub\DouraBot\db\localdb.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="DourabotPostgres" uuid="5cfda9f7-e70a-452e-a1c8-83c61d6ee099">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
+    <data-source source="LOCAL" name="DouraBot_Raspberry" uuid="5b4b0883-d44c-4a60-92cf-8e53f47a6a2b">
+      <driver-ref>postgresql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.postgresql.Driver</jdbc-driver>
+      <jdbc-url>jdbc:postgresql://localhost:5432/postgres</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

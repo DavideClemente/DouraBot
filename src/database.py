@@ -1,4 +1,4 @@
-import sqlite3
+import psycopg2
 from settings import get_logger
 
 logger = get_logger()
@@ -13,16 +13,14 @@ class DatabaseManager:
             cls._instance.db = None
         return cls._instance
 
-    def connect(self, filePath):
-        self.db: sqlite3 = sqlite3.connect(filePath)
-        try:
-            with self.db:
-                self.db.execute(
-                    'CREATE TABLE IF NOT EXISTS BIRTHDAYS(USER_ID INTEGER PRIMARY KEY, USERNAME TEXT NOT NULL UNIQUE, BIRTH_DATE TEXT NOT NULL)')
-        except Exception as e:
-            logger.info(e)
+    def connect(self):
+        self.db: psycopg2 = psycopg2.connect(database='postgres',
+                                             user='postgres',
+                                             host='localhost',
+                                             password='mysecretpassword',
+                                             port=5432)
 
-    def get_connection(self) -> sqlite3:
+    def get_connection(self):
         if not self.db:
             raise ValueError('Database connection not established')
         return self.db

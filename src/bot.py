@@ -1,3 +1,4 @@
+from psycopg2 import OperationalError
 import settings
 import discord
 from discord.ext import commands
@@ -12,10 +13,9 @@ class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
-        if settings.USE_DOCKER_VOLUME:
-            self.db = DatabaseManager().connect(settings.DOCKER_VOLUME_PATH)
-        else:
-            self.db = DatabaseManager().connect(settings.DB_FILE_PATH)
+        self.db = DatabaseManager().connect()
+        self.db = DatabaseManager().get_connection()
+        self.setup_db()
         super().__init__(command_prefix=commands.when_mentioned_or(
             '??'), intents=discord.Intents().default())
 
@@ -45,6 +45,21 @@ class Client(commands.Bot):
 
     async def on_connect(self):
         self.logger.info(f'Bot connected to Discord')
+
+    def setup_db(self):
+        cur = self.db.cursor()
+        commands = ""
+        with open('db\sql_init.sql', 'r') as file:
+            content = file.read()
+            commands = content.split(';')
+        for cmd in commands:
+            try:
+                cmd = cmd.strip()
+                if len(cmd) > 0:
+                    cur.execute(cmd.strip())
+            except OperationalError as e:
+                print(f'Skipped command, reason - {e}')
+        self.db.commit()
 
 
 def log_unhandled_exception(exc_type, exc_value, exc_traceback):
