@@ -1,4 +1,4 @@
-import psycopg2
+import mysql.connector
 from settings import get_logger
 
 logger = get_logger()
@@ -14,13 +14,16 @@ class DatabaseManager:
         return cls._instance
 
     def connect(self):
-        self.db: psycopg2 = psycopg2.connect(database='postgres',
-                                             user='postgres',
-                                             host='localhost',
-                                             password='mysecretpassword',
-                                             port=5432)
+        try:
+            self.db: mysql.connector = mysql.connector.connect(database='master',
+                                                               user='dourabot',
+                                                               host='localhost',
+                                                               password='dourabot123',
+                                                               port=3306)
+        except mysql.connector.Error as e:
+            logger.error(f'Error connecting to MariaDB Database: {e}')
 
-    def get_connection(self):
+    def get_connection(self) -> mysql.connector:
         if not self.db:
             raise ValueError('Database connection not established')
         return self.db

@@ -1,10 +1,9 @@
-from psycopg2 import OperationalError
 import settings
+import mysql.connector
 import discord
 from discord.ext import commands
 import sys
 import os
-import sqlite3
 from database import DatabaseManager
 logger = settings.get_logger()
 
@@ -57,7 +56,7 @@ class Client(commands.Bot):
                 cmd = cmd.strip()
                 if len(cmd) > 0:
                     cur.execute(cmd.strip())
-            except OperationalError as e:
+            except mysql.connector.DatabaseError as e:
                 print(f'Skipped command, reason - {e}')
         self.db.commit()
 

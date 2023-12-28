@@ -1,18 +1,18 @@
 CREATE table if not exists BIRTHDAYS(
-    USER_ID BIGINT PRIMARY KEY NOT NULL,
-    USERNAME varchar NOT NULL,
-    BIRTH_DATE varchar NOT NULL
+    USER_ID BIGINT NOT NULL PRIMARY KEY ,
+    USERNAME varchar(200) NOT NULL,
+    BIRTH_DATE varchar(20) NOT NULL
 );
 
 CREATE TABLE if not exists BIRTHDAY_MESSAGES (
-    ID serial PRIMARY KEY,
-    MESSAGE varchar(2000)
+    ID INT AUTO_INCREMENT PRIMARY KEY,
+    MESSAGE VARCHAR(2000)
 );
 
 CREATE TABLE if not exists CARDS(
-    ID varchar PRIMARY KEY,
-    GAME varchar,
-    image bytea
+    ID VARCHAR(200) PRIMARY KEY,
+    GAME VARCHAR(100),
+    image BLOB
 );
 
 
