@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+    mariadb:
+        image: mariadb
+        container_name: mariaDoura
+        environment:
+            MARIADB_ROOT_PASSWORD: dourabot123
+            MARIADB_DATABASE: master
+            MARIADB_USER: dourabot
+            MARIADB_PASSWORD: dourabot123
+        networks:
+            - douranetwork
+
+    dourabot:
+        image: davide2707clemente/dourabot:latest
+        container_name: dourabot
+        environment:
+            DB_HOST: mariadoura
+            DB_USER: dourabot
+            DB_PASSWORD: dourabot123
+            DB_DATABASE: master
+            DB_PORT: 3306
+        networks:
+            - douranetwork
+networks:
+    douranetwork:
