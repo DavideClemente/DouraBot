@@ -10,10 +10,8 @@ discord.py==2.3.2
 frozenlist==1.4.0
 idna==3.6
 multidict==6.0.4
-psycopg2==2.9.9
 python-dotenv==1.0.0
 requests==2.31.0
 sqlite-database==0.3.0
 urllib3==2.1.0
 yarl==1.9.3
-psycopg2

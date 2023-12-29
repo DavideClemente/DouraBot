@@ -1,5 +1,5 @@
 import mysql.connector
-from settings import get_logger
+from settings import DB_DATABASE, DB_HOST, DB_PASSWORD, DB_PORT, DB_USER, get_logger
 
 logger = get_logger()
 
@@ -15,11 +15,11 @@ class DatabaseManager:
 
     def connect(self):
         try:
-            self.db: mysql.connector = mysql.connector.connect(database='master',
-                                                               user='dourabot',
-                                                               host='localhost',
-                                                               password='dourabot123',
-                                                               port=3306)
+            self.db: mysql.connector = mysql.connector.connect(database=DB_DATABASE,
+                                                               user=DB_USER,
+                                                               host=DB_HOST,
+                                                               password=DB_PASSWORD,
+                                                               port=DB_PORT)
         except mysql.connector.Error as e:
             logger.error(f'Error connecting to MariaDB Database: {e}')
 

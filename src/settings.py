@@ -6,6 +6,13 @@ from logging.handlers import TimedRotatingFileHandler
 
 load_dotenv()
 
+# ENVIRONMENT
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_USER = os.getenv('DB_USER', 'dourabot')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'dourabot123')
+DB_DATABASE = os.getenv('DB_DATABASE', 'master')
+DB_PORT = os.getenv('DB_PORT', 3306)
+
 # CONSTANTS
 ENVIRONMENT = os.getenv("ENVIRONMENT")
 IS_DEV = True if ENVIRONMENT == 'DEV' else False
