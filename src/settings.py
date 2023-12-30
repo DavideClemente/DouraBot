@@ -14,7 +14,7 @@ DB_DATABASE = os.getenv('DB_DATABASE', 'master')
 DB_PORT = os.getenv('DB_PORT', 3306)
 
 # CONSTANTS
-ENVIRONMENT = os.getenv("ENVIRONMENT")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "PROD")
 IS_DEV = True if ENVIRONMENT == 'DEV' else False
 DISCORD_TOKEN = os.getenv(
     "TOKEN_DEV") if IS_DEV else os.getenv("TOKEN_PROD")

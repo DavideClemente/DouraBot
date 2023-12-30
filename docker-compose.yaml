@@ -1,27 +1,32 @@
 version: '3'
 
 services:
-    mariadb:
+    mariadoura:
         image: mariadb
-        container_name: mariaDoura
+        container_name: mariadoura
         environment:
             MARIADB_ROOT_PASSWORD: dourabot123
             MARIADB_DATABASE: master
             MARIADB_USER: dourabot
-            MARIADB_PASSWORD: dourabot123
+            MARIADB_PASSWORD: davide123
         networks:
             - douranetwork
+        # volumes:
+        #     - ./mariadb:/var/lib/mariadb
 
     dourabot:
-        image: davide2707clemente/dourabot:latest
+        image: davide2707clemente/dourabot:1.0
         container_name: dourabot
         environment:
             DB_HOST: mariadoura
-            DB_USER: dourabot
-            DB_PASSWORD: dourabot123
+            DB_USER: root
+            DB_PASSWORD: 'davide123'
             DB_DATABASE: master
-            DB_PORT: 3306
         networks:
             - douranetwork
+        links:
+            - 'mariadoura'
 networks:
     douranetwork:
+        driver: bridge
+        name: douranetwork

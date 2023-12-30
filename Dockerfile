@@ -6,7 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./src ./src
 COPY ./db ./db
-COPY ./logs ./logs
+RUN mkdir ./logs
 COPY .env .
 
 CMD [ "python", "./src/bot.py" ]
