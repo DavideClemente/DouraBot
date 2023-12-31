@@ -20,6 +20,7 @@ DISCORD_TOKEN = os.getenv(
     "TOKEN_DEV") if IS_DEV else os.getenv("TOKEN_PROD")
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))
 
+DOURADINHOS_COLOR = '0x#f28e0e'
 DOURADINHOS_IMAGE = 'https://www.nit.pt/wp-content/uploads/2016/10/ed3647fa-e8e1-47da-984f-4f166d66fa1c-754x394.jpg'
 DOURADINHOS_AVATAR = 'https://cdn.discordapp.com/avatars/1171141490806898809/481485d7a8de607ddcf5a921872f518a.png'
 

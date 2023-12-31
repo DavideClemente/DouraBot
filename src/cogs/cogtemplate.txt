@@ -11,6 +11,9 @@ class admin(commands.Cog):
         self.client = client
         self.logger = logger
 
+    @app_commands.command(name='example', description="example")
+    async def example (self, itr: discord.Interaction):
+        ...
 
 async def setup(client: commands.Bot) -> None:
     await client.add_cog(admin(client))
