@@ -1,0 +1,7 @@
+sudo docker network create --subnet=172.20.0.0/16 --driver bridge douranetwork
+
+sudo docker run -d -p 3306:3306 --network douranetwork -v mariadb:/var/lib/mariadb --name mariadoura --env MARIADB_DATABASE=master --env MARIADB_USER=dourabot --env MARIADB_PASSWORD=dourabot123 --env MARIADB_ROOT_PASSWORD=davide123 --restart always mariadb:latest
+
+sudo docker run -d --restart on-failure --name dourabot --network douranetwork davide2707clemente/dourabot:1.0
+
+
