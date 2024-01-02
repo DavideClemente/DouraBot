@@ -36,7 +36,8 @@ class Movies(commands.Cog):
         embed = discord.Embed(
             title=imdb_data.get('title', ''),
             description=description,
-            url=imdb_data.get('imdb', '')
+            url=imdb_data.get('imdb', ''),
+            color=discord.Color.from_str(settings.DOURADINHOS_COLOR)
         )
         embed.set_image(url=imdb_data.get("image", ''))
         await thread.send(embed=embed)

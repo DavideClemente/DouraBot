@@ -3,7 +3,7 @@ import discord
 import settings
 from discord.ext import commands
 from discord import app_commands
-from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES
+from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES, DOURADINHOS_COLOR
 from logic.utilities import is_role_allowed
 
 
@@ -50,7 +50,8 @@ class admin(commands.Cog):
         """
         self.logger.info(
             f'{itr.user.display_name} announced: Title - {title} | Message - {msg}')
-        embed = discord.Embed(title=title, description=msg)
+        embed = discord.Embed(title=title, description=msg,
+                              color=discord.Color.from_str(DOURADINHOS_COLOR))
         embed.set_author(name='DouraBot', icon_url=DOURADINHOS_AVATAR)
         if thumbnail != None:
             embed.set_thumbnail(url=thumbnail)
