@@ -3,7 +3,7 @@ from itertools import permutations
 import discord
 from discord import Embed
 from random import randint, shuffle
-from settings import DOURADINHOS_IMAGE
+from settings import DOURADINHOS_IMAGE, DOURADINHOS_COLOR
 
 
 def gifts_order(participants):
@@ -21,7 +21,7 @@ def gifts_order(participants):
 def create_embed_gifts(title: str, description: str, footer: str, a: str, b: str):
     embed = discord.Embed(
         title=title.center(20),
-        colour=discord.Colour.dark_teal(),
+        color=discord.Color.from_str(DOURADINHOS_COLOR),
         description=description.center(30)
     )
     total_width = 30

@@ -3,7 +3,7 @@ import discord
 import settings
 from discord.ext import commands
 from discord import app_commands
-from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES
+from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES, DOURADINHOS_COLOR
 from logic.utilities import is_role_allowed
 
 
@@ -37,6 +37,7 @@ class admin(commands.Cog):
             await interaction.response.send_message('Not allowed!', ephemeral=True)
 
     @app_commands.command(name='announce', description='announce a message to the server')
+    @app_commands.checks.cooldown(2, 5 * 60)
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DOURADINHO'], ROLES['DOURA_HONORARIO'])
     async def announce(self, itr: discord.Interaction, channel: discord.TextChannel, title: str, msg: str, thumbnail: str = None):
         """Announce a message to the server
@@ -49,12 +50,18 @@ class admin(commands.Cog):
         """
         self.logger.info(
             f'{itr.user.display_name} announced: Title - {title} | Message - {msg}')
-        embed = discord.Embed(title=title, description=msg)
+        embed = discord.Embed(title=title, description=msg,
+                              color=discord.Color.from_str(DOURADINHOS_COLOR))
         embed.set_author(name='DouraBot', icon_url=DOURADINHOS_AVATAR)
         if thumbnail != None:
             embed.set_thumbnail(url=thumbnail)
         await channel.send(content="@everyone", embed=embed)
         await itr.response.send_message('Announcement made!')
+
+    @announce.error
+    async def announce_error(self, itr: discord.Interaction, error):
+        if isinstance(error, app_commands.CommandOnCooldown):
+            await itr.response.send_message(error, ephemeral=True)
 
 
 async def setup(client: commands.Bot) -> None:

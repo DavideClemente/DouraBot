@@ -1,0 +1,46 @@
+version: '3'
+
+networks:
+    douranetwork:
+        driver: bridge
+        ipam:
+            config:
+                - subnet: '172.22.0.0/16'
+
+services:
+    mariadoura:
+        image: mariadb:latest
+        container_name: mariadoura
+        networks:
+            - douranetwork
+        ports:
+            - '3306:3306'
+        environment:
+            - MARIADB_DATABASE=master
+            - MARIADB_USER=dourabot
+            - MARIADB_PASSWORD=dourabot123
+            - MARIADB_ROOT_PASSWORD=davide123
+        volumes:
+            - ./mariadb:/var/lib/mysql
+        restart: always
+
+    dourabot:
+        depends_on:
+            - mariadoura
+        image: davide2707clemente/dourabot:1.0
+        container_name: dourabot
+        networks:
+            - douranetwork
+        restart: on-failure
+
+    restarter:
+        image: docker:cli
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        command:
+            [
+                '/bin/sh',
+                '-c',
+                'while true; do sleep 86400; docker restart dourabot; done'
+            ]

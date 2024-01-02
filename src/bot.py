@@ -48,7 +48,7 @@ class Client(commands.Bot):
     def setup_db(self):
         cur = self.db.cursor()
         commands = ""
-        with open('db\sql_init.sql', 'r') as file:
+        with open(os.path.join('db', 'sql_init.sql'), 'r') as file:
             content = file.read()
             commands = content.split(';')
         for cmd in commands:

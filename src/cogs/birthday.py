@@ -21,7 +21,8 @@ class Birthday(commands.Cog):
 
     def create_embed(self, user: discord.User):
         embed = discord.Embed(
-            title='🎉 Happy birthday 🎉', description="Hope your day is packed with good times, great company, and some well-deserved relaxation. Here's to another year of epic Discord adventures and awesome moments. Cheers! 🥳🎈")
+            title='🎉 Happy birthday 🎉', description="Hope your day is packed with good times, great company, and some well-deserved relaxation. Here's to another year of epic Discord adventures and awesome moments. Cheers! 🥳🎈",
+            color=discord.Color.from_str(DOURADINHOS_COLOR))
         embed.set_author(name="DouraBot")
         embed.set_image(url=user.avatar.url)
         embed.set_thumbnail(
