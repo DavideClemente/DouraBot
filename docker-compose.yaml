@@ -36,7 +36,8 @@ services:
     restarter:
         image: docker:cli
         restart: unless-stopped
-        volumes: ['var/run/docker.sock:/var/run/docker.sock']
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
         command:
             [
                 '/bin/sh',
