@@ -12,7 +12,7 @@ class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
-        self.db = DatabaseManager().connect()
+        self.db = DatabaseManager().create_pool()
         self.db = DatabaseManager().get_connection()
         self.setup_db()
         super().__init__(command_prefix=commands.when_mentioned_or(

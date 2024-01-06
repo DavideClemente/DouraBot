@@ -98,7 +98,7 @@ class Birthday(commands.Cog):
                     self.db.commit()
                     await itr.response.send_message(f"Edited {who.display_name}'s birthday")
         except Exception as e:
-            await itr.response.send(f'Error while editing birthday - {e}', ephemeral=True)
+            await itr.response.send_message(f'Error while editing birthday - {e}', ephemeral=True)
 
     # @app_commands.command(name='list_birthdays', description="List birthdays in db")
     # @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
