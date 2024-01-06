@@ -114,7 +114,7 @@ class Music(commands.Cog):
                 if not played:
                     msg = await channel.send('There are no songs to be played in the queue')
             await self.delete_message(msg)
-
+        # Play/Pause
         elif reaction.emoji == '⏯️' and user != self.client.user:
             if not self.voice_client:
                 msg = await channel.send("There is no audio to be paused at the moment")
@@ -339,7 +339,7 @@ class Music(commands.Cog):
                 self.queue.append({'song': song, 'channel': user_channel})
                 # If not playing, play the music
                 if not self.is_playing:
-                    if self.voice_client.is_paused():
+                    if self.voice_client != None and self.voice_client.is_paused():
                         embed = self.create_playing_embed(
                             "Added to queue", itr.user, song)
                         msg2 = await itr.followup.send(embed=embed)
@@ -357,40 +357,33 @@ class Music(commands.Cog):
                     msg2 = await itr.followup.send(embed=embed)
                     await self.delete_message(msg2)
 
-    # @app_commands.command(name='previous', description="join vc")
-    # async def previous(self, itr: discord.Interaction):
-    #     await itr.response.defer()
-    #     msg = await itr.followup.send("Playing previous...")
-    #     if self.voice_client == None:
-    #         await itr.followup.send("You need to be in a voice channel to you this command")
-    #     elif self.queue_index <= 0:
-    #         await itr.followup.send("There is no previous song in the queue. Replaying current song")
-    #         self.voice_client.pause()
-    #         await self.play_music(itr.channel.id, itr.user)
-    #     elif self.voice_client != None and self.voice_client:
-    #         self.queue_index -= 1
-    #         self.voice_client.pause()
-    #         await self.play_music(itr.channel.id, itr.user)
-    #     await self.delete_message(msg)
+    @app_commands.command(name='queue', description="display the current queue")
+    async def queue(self, itr: discord.Interaction):
+        await itr.response.defer()
+        """Display the current queue
 
-    # @app_commands.command(name='skip', description="join vc")
-    # async def skip(self, itr: discord.Interaction):
-    #     await itr.response.defer()
-    #     msg = await itr.followup.send("Skipping...")
+        Args:
+            itr (discord.Interaction): Discord interaction
+        """
 
-    #     if self.voice_client == None:
-    #         await itr.response.send_message("You need to be in a voice channel to you this command")
-    #     elif self.queue_index >= len(self.queue) - 1:
-    #         await itr.response.send_message("There is no next song in the queue. Replaying current song")
-    #         self.voice_client.pause()
-    #         await self.play_music(itr.channel.id, itr.user)
-    #     elif self.voice_client != None and self.voice_client:
-    #         self.queue_index += 1
-    #         self.voice_client.pause()
-    #         played = await self.play_music(itr.channel.id, itr.user)
-    #         await self.delete_message(msg)
-    #         if not played:
-    #             await itr.response.send_message('There are no songs to be played in the queue')
+        previous = self.queue[
+            self.queue_index - 1]['song'] if len(self.queue) > 1 and self.queue_index >= 1 else None
+        current = self.queue[self.queue_index]['song']
+        embed = discord.Embed(
+            title="🎚️ Music queue 🎚️")
+        if previous != None:
+            embed.add_field(
+                name="PREVIOUS", value=f'[{previous["title"]}]({previous["link"]})', inline=False)
+        embed.add_field(
+            name="CURRENT", value=f'[{current["title"]}]({current["link"]})', inline=False)
+        try:
+            if self.queue[self.queue_index+1]:
+                songs = "\n".join(
+                    f'[{song["song"]["title"]}]({song["song"]["link"]})' for song in self.queue[self.queue_index+1:])
+                embed.add_field(name="PLAYING NEXT", value=songs, inline=False)
+        except:
+            pass
+        await itr.followup.send(embed=embed)
 
 
 async def setup(client: commands.Bot) -> None:
