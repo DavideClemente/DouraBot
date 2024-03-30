@@ -45,6 +45,7 @@ ROLES = {'DOURADINHO_GOD': 759023632051339264,
 
 IMDB_API = os.getenv("CLOUDFLARE_WORKER")
 CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={os.getenv("CURRENCY_API_KEY")}'
+CARD_API = 'https://www.deckofcardsapi.com/api'
 # Configure the root logger
 print(LOG_FILE_PATH)
 print(os.listdir(os.path.curdir))
