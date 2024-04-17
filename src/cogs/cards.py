@@ -4,9 +4,13 @@ from discord.interactions import Interaction
 from database import DatabaseManager
 from discord.ext import commands
 from discord import app_commands
-from settings import get_logger
+from settings import get_logger, CARD_API
 import uuid
+import requests
 import mysql.connector
+
+
+RANDOM_CARD_URL = CARD_API + '/deck/new/draw/?count=1'
 
 
 class GameDropDown(discord.ui.Select):
@@ -15,8 +19,8 @@ class GameDropDown(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label="So...", description="52 questions, unlimited conversation"),
-            discord.SelectOption(label="Not implemented",
-                                 description="Not implemented")
+            discord.SelectOption(
+                label="Default Card", description="A normal playing card")
         ]
         super().__init__(placeholder="Dropdown menu",
                          min_values=1, max_values=1, options=options)
@@ -25,6 +29,16 @@ class GameDropDown(discord.ui.Select):
         await itr.response.defer()
         if self.values[0] == "So...":
             await itr.followup.send(file=await self.draw_card(self.values[0]))
+        elif self.values[0] == "Default Card":
+            response = requests.get(RANDOM_CARD_URL)
+            json_response = response.json()
+
+            if json_response['success']:
+                embed = discord.Embed()
+                embed.set_image(url=json_response['cards'][0]['image'])
+                await itr.followup.send(embed=embed)
+            else:
+                await itr.followup.send_message(f'Error drawing card')
         else:
             await itr.followup.send_message(f'Not implemented')
 
