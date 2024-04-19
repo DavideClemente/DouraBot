@@ -309,3 +309,5 @@ pyrightconfig.json
 
 # Db files
 db/*.db
+
+mariadb/*
