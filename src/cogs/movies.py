@@ -77,8 +77,9 @@ class Movies(commands.Cog):
             name=f'Search Imdb "{title}"',
             type=ChannelType.public_thread)
 
-        for result in json_res["results"]:
-            await self.sendResults(thread, result)
+        tasks = [self.sendResults(thread, result)
+                 for result in json_res["results"]]
+        await asyncio.gather(*tasks)
 
 
 async def setup(client: commands.Bot) -> None:
