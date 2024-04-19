@@ -291,7 +291,7 @@ class Music(commands.Cog):
             await itr.response.send_message('DouraBot is not in a voice channel')
 
     @app_commands.command(name='play', description="play a song")
-    async def play(self, itr: discord.Interaction, search: str = None):
+    async def play(self, itr: discord.Interaction, song: str = None):
         """Play a song
 
         Args:
@@ -302,7 +302,7 @@ class Music(commands.Cog):
         if not itr.user.voice:
             await itr.followup.send('You need to be connected to a voice channel')
         # Play the musics in the queue
-        if search == None:
+        if song == None:
             # Check if queue is empty
             if len(self.queue) == 0:
                 await itr.followup.send('There are no songs to be played in the queue')
@@ -329,7 +329,7 @@ class Music(commands.Cog):
         else:
             # Get song from youtube (For now just the first one)
             # TODO: Choose which music to play in a dropdown
-            song = self.extract_youtube(self.search_youtube(search)[0])
+            song = self.extract_youtube(self.search_youtube(song)[0])
             # Check if music found
             if song == {}:
                 await itr.followup.send('Could not play the song.')
