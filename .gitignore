@@ -311,3 +311,4 @@ pyrightconfig.json
 db/*.db
 
 mariadb/*
+logs/*
