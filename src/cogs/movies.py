@@ -1,3 +1,4 @@
+import asyncio
 import discord
 import settings
 from discord.ext import commands
@@ -21,6 +22,11 @@ class Movies(commands.Cog):
             thread (discord.Thread): Thread to send results to
             imdb_data (dict): Data from imdb
         """
+
+        # If there is no image, the title is probably not valid
+        if (imdb_data.get("image") is None):
+            return
+
         movie_id = imdb_data["id"]
         details = requests.get(
             f'{IMDB_API}/title/{movie_id}').json()
@@ -29,7 +35,8 @@ class Movies(commands.Cog):
             Directors - {", ".join(details.get("directors", []))}
             Genres - {", ".join(details.get("genre", []))}
             Year - {details.get("year", "")}
-            Rating - {rating_to_stars(details.get("rating", {}).get("star", 0))} ({details.get("rating", {}).get("star", 0)})
+            Rating - {rating_to_stars(details.get("rating", {}).get("star", 0))} (
+                {details.get("rating", {}).get("star", 0)})
             Url - {imdb_data.get("imdb", "")}
         '''
 
@@ -51,8 +58,8 @@ class Movies(commands.Cog):
             itr (discord.Interaction): _description_
             title (str): Movie/Series title
         """
-        self.logger.info(
-            f'User {itr.user.display_name} called show_logs/{title}')
+        self.logger.debug(
+            f'User {itr.user.display_name} called search_imdb/{title}')
         await itr.response.defer()
 
         resp = requests.get(
@@ -63,7 +70,8 @@ class Movies(commands.Cog):
             return
 
         json_res = resp.json()
-        await itr.followup.send(json_res["message"])
+
+        await itr.followup.send("Sending results to a thread...")
         channel = self.client.get_channel(itr.channel_id)
         thread = await channel.create_thread(
             name=f'Search Imdb "{title}"',

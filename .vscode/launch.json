@@ -6,9 +6,17 @@
     "configurations": [
         {
             "name": "DouraBot",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "src\\bot.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "DouraBot Mac OS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/bot.py",
             "console": "integratedTerminal",
             "justMyCode": true
         }
