@@ -25,10 +25,15 @@ DOURADINHOS_IMAGE = 'https://www.nit.pt/wp-content/uploads/2016/10/ed3647fa-e8e1
 DOURADINHOS_AVATAR = 'https://cdn.discordapp.com/avatars/1171141490806898809/481485d7a8de607ddcf5a921872f518a.png'
 
 # CHANNEL IDS
+MODS_CHANNEL = 1233748279376875531
 GENERAL_CHANNEL = 756505500677308486
 PRIVATE_DOURA_CHANNEL = 860682465185234944
 DEV_CHANNEL = 1171143985595686983
 
+# ASSETO CORSA LINKS
+CARS_LINK = 'https://drive.google.com/drive/folders/1FaIDOQ2L2jpUzsatK1CmBlR77BqyhUIJ?usp=drive_link'
+TRACKS_LINK = 'https://drive.google.com/drive/folders/1DUxemFJuFimWt3OqGI-3pCdq99Vv0L2i?usp=drive_link'
+APPS_LINK = 'https://drive.google.com/drive/folders/18rLa9etKzhzrpVfz4rzYCJ5h7tEDwNbC?usp=drive_link'
 # PATHS
 LOG_FILE_PATH = os.path.join('logs', 'logs.log')
 COGS_PATH = os.path.join('src', 'cogs')
@@ -44,7 +49,8 @@ ROLES = {'DOURADINHO_GOD': 759023632051339264,
          }
 
 IMDB_API = os.getenv("CLOUDFLARE_WORKER")
-CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={os.getenv("CURRENCY_API_KEY")}'
+CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={
+    os.getenv("CURRENCY_API_KEY")}'
 CARD_API = 'https://www.deckofcardsapi.com/api'
 # Configure the root logger
 print(LOG_FILE_PATH)
