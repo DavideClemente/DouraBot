@@ -1,9 +1,31 @@
 import discord
 import settings
 from discord.ext import commands
-from discord import app_commands
+from discord import Emoji, app_commands
 from settings import ROLES
 from logic.utilities import is_role_allowed
+from discord.ui import Button, Select, View
+
+
+roles = [("ASSETO", "🏎️")]
+
+
+class MyView(View):
+    def __init__(self):
+        super().__init__()
+
+    @discord.ui.select(
+        cls=Select,
+        placeholder="Select currency to convert from",
+        options=[discord.SelectOption(
+            label=role[0], value=settings.ROLES[role[0]], emoji=role[1])
+            for role in roles],
+        row=1)
+    async def select_callback(self, interaction: discord.Interaction, select: Select):
+        user = interaction.user
+        role = discord.utils.get(user.guild.roles, id=select.values[0])
+        user.add_roles(role)
+        return await interaction.response.defer()
 
 
 class Roles(commands.Cog):
@@ -20,10 +42,11 @@ class Roles(commands.Cog):
 
         return embed
 
-    @app_commands.command(name='role_message', description="give roles")
-    async def role_message(self, itr: discord.Interaction):
-        embed = self.create_embed()
-        await itr.response.send_message(embed=embed)
+    @commands.Cog.listener()
+    async def on_ready(self):
+        channel = self.client.get_channel(settings.DEV_CHANNEL)
+        await channel.send(embed=self.create_embed(),
+                           view=MyView())
 
 
 async def setup(client: commands.Bot) -> None:
