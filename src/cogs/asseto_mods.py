@@ -16,13 +16,13 @@ class LinkButton(Button):
 
 class MyView(View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__()
         self.add_item(Button(style=ButtonStyle.link, label='Cars',
-                      url=settings.CARS_LINK, emoji='🏎️', custom_id="asseto_mods:cars"))
+                      url=settings.CARS_LINK, emoji='🏎️'))
         self.add_item(Button(style=ButtonStyle.link, label='Tracks',
-                      url=settings.TRACKS_LINK, emoji='🗺️', custom_id="asseto_mods:tracks"))
+                      url=settings.TRACKS_LINK, emoji='🗺️'))
         self.add_item(Button(style=ButtonStyle.link, label='Apps',
-                      url=settings.APPS_LINK, emoji='📱', custom_id="asseto_mods:apps"))
+                      url=settings.APPS_LINK, emoji='📱'))
 
 
 class mods(commands.Cog):

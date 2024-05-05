@@ -5,12 +5,17 @@ from discord.ext import commands
 from discord import app_commands
 from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES, DOURADINHOS_COLOR
 from logic.utilities import is_role_allowed
+import re
 
 
 class admin(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.get_logger()
+
+    def remove_ansi_escape_codes(self, text):
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', text)
 
     @app_commands.command(name='show_logs', description='show recent bot logs')
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
@@ -26,7 +31,7 @@ class admin(commands.Cog):
         with open(settings.LOG_FILE_PATH, "r") as file:
             lines_list = file.readlines()
             last_lines = lines_list[-lines:]
-            lineList += '\n'.join(last_lines)
+            lineList += '\n'.join(self.remove_ansi_escape_codes(last_lines))
         await interaction.followup.send(f'{multiline_string}\n>>> {lineList}')
 
     @show_logs.error
