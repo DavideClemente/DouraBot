@@ -18,6 +18,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "PROD")
 IS_DEV = True if ENVIRONMENT == 'DEV' else False
 DISCORD_TOKEN = os.getenv(
     "TOKEN_DEV") if IS_DEV else os.getenv("TOKEN_PROD")
+DISCORD_ID = int(os.getenv("DOURADINHOS"))
 DISCORD_GUILD = discord.Object(id=int(os.getenv("DOURADINHOS")))
 
 DOURADINHOS_COLOR = '0x#f28e0e'
@@ -28,6 +29,7 @@ DOURADINHOS_AVATAR = 'https://cdn.discordapp.com/avatars/1171141490806898809/481
 GENERAL_CHANNEL = 756505500677308486
 PRIVATE_DOURA_CHANNEL = 860682465185234944
 DEV_CHANNEL = 1171143985595686983
+ROLES_CHANNEL = 1236703744524025947
 
 # PATHS
 LOG_FILE_PATH = os.path.join('logs', 'logs.log')
@@ -39,14 +41,14 @@ ROLES = {'DOURADINHO_GOD': 759023632051339264,
          'DOURADINHO_MESTRE': 759023197004890152,
          'DOURADINHO': 760530815456378981,
          'DOURA_HONORARIO': 882416521584975882,
-         'DEV': 1171144045481959424,
-         'ASSETO': 1094752371910918174,
-         'test': 1236371952944418940,
-         'Lorita': 760530316955090976
+         'DEV': 1171144045481959424
          }
 
+PREMIUM_ROLES = {'ASSETO_PREMIUM': 1233745879945580635}
+
 IMDB_API = os.getenv("CLOUDFLARE_WORKER")
-CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={os.getenv("CURRENCY_API_KEY")}'
+CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={
+    os.getenv("CURRENCY_API_KEY")}'
 CARD_API = 'https://www.deckofcardsapi.com/api'
 # Configure the root logger
 print(LOG_FILE_PATH)
