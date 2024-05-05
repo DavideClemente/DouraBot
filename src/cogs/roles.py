@@ -1,19 +1,23 @@
+
 import discord
 import settings
 from discord.ext import commands
 from discord.ui import Button, View
 import emoji
 
+logger = settings.get_logger()
+
 
 class RoleButton(Button):
     def __init__(self):
-        super().__init__(style=discord.ButtonStyle.primary,
-                         label="Add Role", emoji="🎮")
+        super().__init__(
+            custom_id="role_button:primary",
+            style=discord.ButtonStyle.primary,
+            label="Add Role", emoji="🎮")
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         user = interaction.user
-        roles = interaction.guild.roles
         guild = interaction.guild
         view = MyRoleView(guild, user)
         embed = discord.Embed(title="🎮 Game Roles 🎮", description="==============> 𝗦𝗘𝗟𝗘𝗖𝗧 𝗬𝗢𝗨𝗥 𝗥𝗢𝗟𝗘 <==============",
@@ -36,6 +40,7 @@ class MyRoleSelect(discord.ui.Select):
             roles = [discord.SelectOption(
                 label=role.name, value=str(role.id)) for role in filtered_roles]
         super().__init__(
+            custom_id="persistent_select:game_roles",
             placeholder="Select a role",
             min_values=1,
             max_values=1,
@@ -55,6 +60,8 @@ class MyRoleSelect(discord.ui.Select):
         user = interaction.user
         # Add the role to the user
         await user.add_roles(selected_role)
+        logger.info(f'{user.display_name} added role {selected_role.name}')
+
         embed = discord.Embed(title="🎮 Game Roles 🎮", description=f"Role `{selected_role.name}` added!",
                               color=discord.Color.from_str(settings.DOURADINHOS_COLOR))
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -81,8 +88,9 @@ class Roles(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        view = View()
+        view = View(timeout=None)
         view.add_item(RoleButton())
+        self.client.add_view(view)
         channel = self.client.get_channel(settings.ROLES_CHANNEL)
         await channel.send(embed=self.create_embed(), view=view)
 

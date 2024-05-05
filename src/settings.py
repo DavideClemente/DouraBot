@@ -7,15 +7,21 @@ from logging.handlers import TimedRotatingFileHandler
 load_dotenv()
 
 # ENVIRONMENT
-DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_USER = os.getenv('DB_USER', 'dourabot')
-DB_PASSWORD = os.getenv('DB_PASSWORD', 'dourabot123')
-DB_DATABASE = os.getenv('DB_DATABASE', 'master')
-DB_PORT = os.getenv('DB_PORT', 3306)
-
-# CONSTANTS
 ENVIRONMENT = os.getenv("ENVIRONMENT", "PROD")
 IS_DEV = True if ENVIRONMENT == 'DEV' else False
+if IS_DEV:
+    DB_HOST = 'localhost'
+    DB_USER = 'dourabot'
+    DB_PASSWORD = 'dourabot123'
+    DB_DATABASE = 'master'
+else:
+    DB_HOST = 'mariadoura'
+    DB_USER = 'root'
+    DB_PASSWORD = 'davide123'
+    DB_DATABASE = 'master'
+DB_PORT = 3306
+
+# CONSTANTS
 DISCORD_TOKEN = os.getenv(
     "TOKEN_DEV") if IS_DEV else os.getenv("TOKEN_PROD")
 DISCORD_ID = int(os.getenv("DOURADINHOS"))
@@ -32,10 +38,13 @@ PRIVATE_DOURA_CHANNEL = 860682465185234944
 DEV_CHANNEL = 1171143985595686983
 ROLES_CHANNEL = 1236703744524025947
 
+
 # ASSETO CORSA LINKS
 CARS_LINK = 'https://drive.google.com/drive/folders/1FaIDOQ2L2jpUzsatK1CmBlR77BqyhUIJ?usp=drive_link'
 TRACKS_LINK = 'https://drive.google.com/drive/folders/1DUxemFJuFimWt3OqGI-3pCdq99Vv0L2i?usp=drive_link'
 APPS_LINK = 'https://drive.google.com/drive/folders/18rLa9etKzhzrpVfz4rzYCJ5h7tEDwNbC?usp=drive_link'
+
+
 # PATHS
 LOG_FILE_PATH = os.path.join('logs', 'logs.log')
 COGS_PATH = os.path.join('src', 'cogs')
@@ -52,13 +61,16 @@ ROLES = {'DOURADINHO_GOD': 759023632051339264,
 PREMIUM_ROLES = {'ASSETO_PREMIUM': 1233745879945580635}
 
 IMDB_API = os.getenv("CLOUDFLARE_WORKER")
-
 api_key = os.getenv("CURRENCY_API_KEY")
 CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={api_key}'
 CARD_API = 'https://www.deckofcardsapi.com/api'
+
 # Configure the root logger
-print(LOG_FILE_PATH)
-print(os.listdir(os.path.curdir))
+
+# Clear the log file
+with open(LOG_FILE_PATH, 'w') as f:
+    pass
+
 logging.basicConfig(level=logging.INFO,
                     filename=LOG_FILE_PATH,
                     datefmt='%Y-%m-%d %H:%M:%S',
