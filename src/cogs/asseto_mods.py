@@ -1,11 +1,9 @@
-from email.mime import image
-from io import BytesIO
 import discord
 import settings
 from discord.ext import commands
-from discord import app_commands
-from settings import ROLES
+from database import DatabaseManager
 from discord.ui import View, Button
+from logic.utilities import get_persistent_message, insert_persistent_message
 from discord import ButtonStyle
 
 
@@ -25,19 +23,25 @@ class MyView(View):
                       url=settings.APPS_LINK, emoji='📱'))
 
 
-class mods(commands.Cog):
+class Mods(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.logger
+        self.db = DatabaseManager().get_connection()
 
     @commands.Cog.listener()
     async def on_ready(self):
         channel = self.client.get_channel(settings.MODS_CHANNEL)
-        with open('assets/asseto_cover.jpg', 'rb') as file:
-            await channel.send("**Asseto Corsa Mods**",
-                               file=discord.File(file),
-                               view=MyView())
+        message = get_persistent_message(self.db, "mods_message")
+        if message is None:
+            insert_persistent_message(self.db, "mods_message")
+            with open('assets/asseto_cover.jpg', 'rb') as file:
+                await channel.send("**Asseto Corsa Mods**",
+                                   file=discord.File(file),
+                                   view=MyView())
+        else:
+            self.logger.info("Mods message already exists")
 
 
 async def setup(client: commands.Bot) -> None:
-    await client.add_cog(mods(client))
+    await client.add_cog(Mods(client))
