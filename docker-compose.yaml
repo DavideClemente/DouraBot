@@ -27,7 +27,7 @@ services:
     dourabot:
         depends_on:
             - mariadoura
-        image: davide2707clemente/dourabot:1.0
+        image: davide2707clemente/dourabot:1.2
         container_name: dourabot
         networks:
             - douranetwork

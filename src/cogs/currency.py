@@ -9,7 +9,7 @@ from logic.utilities import is_role_allowed
 from settings import ROLES
 
 currencies = [('GBP', '🇬🇧'), ('USD', '🇺🇸'), ('EUR', '🇪🇺'),
-              ('JPY', '🇯🇵'), ('CHF', '🇨🇭'), ('AUD', '🇦🇺'), ('CAD', '🇨🇦'), ('INR', '🇮🇳'), ('BZR', '🇧🇷')]
+              ('JPY', '🇯🇵'), ('CHF', '🇨🇭'), ('AUD', '🇦🇺'), ('CAD', '🇨🇦'), ('INR', '🇮🇳'), ('BRL', '🇧🇷')]
 
 
 class MySelectView(View):
