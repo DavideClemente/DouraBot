@@ -30,16 +30,6 @@ class DatabaseManager:
         except mysql.connector.Error as e:
             logger.error(f'Error creating connection pool: {e}')
 
-    # def connect(self):
-    #     try:
-    #         self.db: mysql.connector = mysql.connector.connect(database=DB_DATABASE,
-    #                                                            user=DB_USER,
-    #                                                            host=DB_HOST,
-    #                                                            password=DB_PASSWORD,
-    #                                                            port=DB_PORT)
-    #     except mysql.connector.Error as e:
-    #         logger.error(f'Error connecting to MariaDB Database: {e}')
-
     def get_connection(self) -> mysql.connector:
         if not self._pool:
             raise ValueError('Connection pool not created')

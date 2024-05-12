@@ -29,3 +29,17 @@ def convert_to_datetime(date_str: str) -> datetime:
     except ValueError:
         # If parsing fails, raise an exception or handle the error accordingly
         raise ValueError("Invalid date format. Please use MM-DD.")
+
+
+def get_persistent_message(db, event):
+    with db.cursor() as cursor:
+        cursor.execute(
+            "SELECT ID FROM PERSISTENT_MESSAGES WHERE EVENT = %s", (event,))
+        return cursor.fetchone()
+
+
+def insert_persistent_message(db, event):
+    with db.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO PERSISTENT_MESSAGES (EVENT) VALUES(%s)", (event,))
+        db.commit()
