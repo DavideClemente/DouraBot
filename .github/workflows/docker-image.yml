@@ -4,6 +4,7 @@ on:
   push:
     branches: [ "master" ]
 
+
 jobs:
 
   build:
@@ -28,3 +29,8 @@ jobs:
         push: true
         tags: davide2707clemente/dourabot:latest
         platforms: linux/amd64,linux/arm64
+        build-args: |
+          TOKEN_PROD=${{ vars.TOKEN_PROD }}
+          DOURADINHOS=${{ vars.DOURADINHOS }}
+          CURRENCY_API_KEY=${{ vars.CURRENCY_API_KEY }}
+          CLOUDFLARE_WORKER=${{ vars.CLOUDFLARE_WORKER }}
