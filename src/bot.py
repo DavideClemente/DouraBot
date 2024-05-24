@@ -5,6 +5,8 @@ from discord.ext import commands
 import sys
 import os
 from database import DatabaseManager
+from logic.images import create_welcome_image, get_image, get_image_db
+from logic.users import insert_user, get_next_user_number
 logger = settings.get_logger()
 
 
@@ -16,7 +18,7 @@ class Client(commands.Bot):
         self.db = DatabaseManager().get_connection()
         self.setup_db()
         super().__init__(command_prefix=commands.when_mentioned_or(
-            '??'), intents=discord.Intents().default())
+            '??'), intents=discord.Intents().all())
 
     async def on_ready(self):
         self.logger.info(f'User: {self.user} (ID: {self.user.id})')
@@ -44,6 +46,28 @@ class Client(commands.Bot):
 
     async def on_connect(self):
         self.logger.info(f'Bot connected to Discord')
+
+    async def on_member_join(self, member: discord.Member):
+        user_number = get_next_user_number(DatabaseManager().get_connection())
+        self.logger.info(
+            f'User number {user_number} assigned to {member.display_name}')
+        insert_user(DatabaseManager().get_connection(),
+                    member.id, member.display_name, user_number)
+        avatar = member.avatar.url
+        avatar_img = get_image(avatar)
+        avatar_img = avatar_img.resize((150, 150))
+        bck_image = get_image_db(
+            DatabaseManager().get_connection(), 'background_welcome')
+
+        result = create_welcome_image(
+            member.display_name, user_number, avatar_img, bck_image)
+        file = discord.File(result, filename='image.jpg')
+
+        await self.get_channel(settings.WELCOME_CHANNEL).send(content=f"Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!", file=file)
+        self.logger.info(f'{member.display_name} has joined the server')
+
+    async def on_member_remove(self, member: discord.Member):
+        self.logger.info(f'{member.display_name} has left the server')
 
     def setup_db(self):
         cur = self.db.cursor()
