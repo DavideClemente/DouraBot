@@ -35,7 +35,6 @@ def create_circle(diameter):
 
 
 def create_welcome_image(username, user_number, profile: Image.Image, background: Image.Image):
-    db = DatabaseManager().get_connection()
     mask = create_circle(profile.height)
     profile.putalpha(mask)
 
