@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./src ./src
 COPY ./db ./db
 COPY ./assets ./assets
+COPY ./fonts ./fonts
 RUN mkdir ./logs
 
 # ENVIRONMENT VARIABLES
