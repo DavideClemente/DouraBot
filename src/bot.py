@@ -63,7 +63,7 @@ class Client(commands.Bot):
             member.display_name, user_number, avatar_img, bck_image)
         file = discord.File(result, filename='image.jpg')
 
-        await self.get_channel(settings.DEV_CHANNEL).send(content=f"Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!", file=file)
+        await self.get_channel(settings.WELCOME_CHANNEL).send(content=f"Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!", file=file)
         self.logger.info(f'{member.display_name} has joined the server')
 
     async def on_member_remove(self, member: discord.Member):
