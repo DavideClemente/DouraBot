@@ -43,3 +43,8 @@ def insert_persistent_message(db, event):
         cursor.execute(
             "INSERT INTO PERSISTENT_MESSAGES (EVENT) VALUES(%s)", (event,))
         db.commit()
+
+
+def hex_to_rgba(hex_color: str):
+    hex_color = hex_color.lstrip('0x#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (255,)
