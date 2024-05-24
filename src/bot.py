@@ -48,16 +48,16 @@ class Client(commands.Bot):
         self.logger.info(f'Bot connected to Discord')
 
     async def on_member_join(self, member: discord.Member):
-        user_number = get_next_user_number(DatabaseManager().get_connection())
+        user_number = get_next_user_number(self.db)
         self.logger.info(
             f'User number {user_number} assigned to {member.display_name}')
-        insert_user(DatabaseManager().get_connection(),
+        insert_user(self.db,
                     member.id, member.display_name, user_number)
         avatar = member.avatar.url
         avatar_img = get_image(avatar)
         avatar_img = avatar_img.resize((150, 150))
         bck_image = get_image_db(
-            DatabaseManager().get_connection(), 'background_welcome')
+            self.db, 'background_welcome')
 
         result = create_welcome_image(
             member.display_name, user_number, avatar_img, bck_image)
