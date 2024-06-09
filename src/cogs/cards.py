@@ -44,7 +44,7 @@ class GameDropDown(discord.ui.Select):
             with conn.cursor() as cursor:
                 cursor.execute(
                     "SELECT * FROM CARDS WHERE game = %s ORDER BY RAND()", (gameQuery,))
-                _, _, byte_array = cursor.fetchone()
+                _, _, byte_array = cursor.fetchall()[0]
                 return discord.File(fp=io.BytesIO(
                     byte_array), filename='image.jpg')
 
