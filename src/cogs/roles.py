@@ -1,5 +1,6 @@
 
 import discord
+from websockets import Data
 import settings
 from database import DatabaseManager
 from discord.ext import commands
@@ -79,7 +80,6 @@ class Roles(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.logger
-        self.db = DatabaseManager().get_connection()
 
     def create_embed(self):
         embed = discord.Embed(title="Game Roles",
@@ -95,12 +95,13 @@ class Roles(commands.Cog):
         view.add_item(RoleButton())
         self.client.add_view(view)
         channel = self.client.get_channel(settings.ROLES_CHANNEL)
-        message = get_persistent_message(self.db, "roles_message")
-        if message is None:
-            insert_persistent_message(self.db, "roles_message")
-            await channel.send(embed=self.create_embed(), view=view)
-        else:
-            logger.info("Roles message already exists")
+        with DatabaseManager().get_connection() as conn:
+            message = get_persistent_message(conn, "roles_message")
+            if message is None:
+                insert_persistent_message(conn, "roles_message")
+                await channel.send(embed=self.create_embed(), view=view)
+            else:
+                logger.info("Roles message already exists")
 
 
 async def setup(client: commands.Bot) -> None:

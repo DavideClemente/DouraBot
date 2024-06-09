@@ -1,3 +1,4 @@
+from websockets import Data
 import settings
 import mysql.connector
 import discord
@@ -14,8 +15,7 @@ class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
-        self.db = DatabaseManager().create_pool()
-        self.db = DatabaseManager().get_connection()
+        DatabaseManager().create_pool()
         self.setup_db()
         super().__init__(command_prefix=commands.when_mentioned_or(
             '??'), intents=discord.Intents().all())
@@ -48,16 +48,17 @@ class Client(commands.Bot):
         self.logger.info(f'Bot connected to Discord')
 
     async def on_member_join(self, member: discord.Member):
-        user_number = get_next_user_number(self.db)
-        self.logger.info(
-            f'User number {user_number} assigned to {member.display_name}')
-        insert_user(self.db,
-                    member.id, member.display_name, user_number)
-        avatar = member.avatar.url
-        avatar_img = get_image(avatar)
-        avatar_img = avatar_img.resize((150, 150))
-        bck_image = get_image_db(
-            self.db, 'background_welcome')
+        with DatabaseManager().get_connection() as conn:
+            user_number = get_next_user_number(conn)
+            self.logger.info(
+                f'User number {user_number} assigned to {member.display_name}')
+            insert_user(conn,
+                        member.id, member.display_name, user_number)
+            avatar = member.avatar.url
+            avatar_img = get_image(avatar)
+            avatar_img = avatar_img.resize((150, 150))
+            bck_image = get_image_db(
+                conn, 'background_welcome')
 
         result = create_welcome_image(
             member.display_name, user_number, avatar_img, bck_image)
@@ -70,19 +71,20 @@ class Client(commands.Bot):
         self.logger.info(f'{member.display_name} has left the server')
 
     def setup_db(self):
-        cur = self.db.cursor()
-        commands = ""
-        with open(os.path.join('db', 'sql_init.sql'), 'r') as file:
-            content = file.read()
-            commands = content.split(';')
-        for cmd in commands:
-            try:
-                cmd = cmd.strip()
-                if len(cmd) > 0:
-                    cur.execute(cmd.strip())
-            except mysql.connector.DatabaseError as e:
-                print(f'Skipped command, reason - {e}')
-        self.db.commit()
+        with DatabaseManager().get_connection() as conn:
+            cur = conn.cursor()
+            commands = ""
+            with open(os.path.join('db', 'sql_init.sql'), 'r') as file:
+                content = file.read()
+                commands = content.split(';')
+            for cmd in commands:
+                try:
+                    cmd = cmd.strip()
+                    if len(cmd) > 0:
+                        cur.execute(cmd.strip())
+                except mysql.connector.DatabaseError as e:
+                    print(f'Skipped command, reason - {e}')
+            conn.commit()
 
 
 def log_unhandled_exception(exc_type, exc_value, exc_traceback):
