@@ -27,20 +27,20 @@ class Mods(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.logger
-        self.db = DatabaseManager().get_connection()
 
     @commands.Cog.listener()
     async def on_ready(self):
-        channel = self.client.get_channel(settings.MODS_CHANNEL)
-        message = get_persistent_message(self.db, "mods_message")
-        if message is None:
-            insert_persistent_message(self.db, "mods_message")
-            with open('assets/asseto_cover.jpg', 'rb') as file:
-                await channel.send("**Asseto Corsa Mods**",
-                                   file=discord.File(file),
-                                   view=MyView())
-        else:
-            self.logger.info("Mods message already exists")
+        with DatabaseManager().get_connection() as conn:
+            channel = self.client.get_channel(settings.MODS_CHANNEL)
+            message = get_persistent_message(conn, "mods_message")
+            if message is None:
+                insert_persistent_message(conn, "mods_message")
+                with open('assets/asseto_cover.jpg', 'rb') as file:
+                    await channel.send("**Asseto Corsa Mods**",
+                                       file=discord.File(file),
+                                       view=MyView())
+            else:
+                self.logger.info("Mods message already exists")
 
 
 async def setup(client: commands.Bot) -> None:
