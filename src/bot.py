@@ -8,6 +8,7 @@ import os
 from database import DatabaseManager
 from logic.images import create_welcome_image, get_image, get_image_db
 from logic.users import insert_user, get_next_user_number
+from cogs.configs import get_config
 logger = settings.get_logger()
 
 
@@ -48,6 +49,10 @@ class Client(commands.Bot):
         self.logger.info(f'Bot connected to Discord')
 
     async def on_member_join(self, member: discord.Member):
+        try:
+            member.add_roles(get_config('DEFAULT_ROLE'))
+        except Exception as e:
+            print(e)
         with DatabaseManager().get_connection() as conn:
             user_number = get_next_user_number(conn)
             self.logger.info(
