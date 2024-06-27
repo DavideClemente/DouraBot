@@ -8,14 +8,15 @@ from logic.utilities import is_role_allowed
 import re
 
 
-class admin(commands.Cog):
+def remove_ansi_escape_codes(text):
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
+
+class Admin(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.get_logger()
-
-    def remove_ansi_escape_codes(self, text):
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', text)
 
     @app_commands.command(name='show_logs', description='show recent bot logs')
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
@@ -31,7 +32,7 @@ class admin(commands.Cog):
         with open(settings.LOG_FILE_PATH, "r") as file:
             lines_list = file.readlines()
             last_lines = lines_list[-lines:]
-            lineList += '\n'.join(self.remove_ansi_escape_codes(last_lines))
+            lineList += '\n'.join(remove_ansi_escape_codes(last_lines))
         await interaction.followup.send(f'{multiline_string}\n>>> {lineList}')
 
     @show_logs.error
@@ -43,22 +44,23 @@ class admin(commands.Cog):
 
     @app_commands.command(name='announce', description='announce a message to the server')
     @app_commands.checks.cooldown(2, 5 * 60)
-    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DOURADINHO'], ROLES['DOURA_HONORARIO'])
+    @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'])
     async def announce(self, itr: discord.Interaction, channel: discord.TextChannel, title: str, msg: str, thumbnail: str = None):
         """Announce a message to the server
 
         Args:
-            itr (discord.Interaction): _description_
-            title (str): Announcement title
-            msg (str): Announcement description
-            thumbnail (str, optional): Thumbnail url. Defaults to None.
+            :param thumbnail: Thumbnail url. Defaults to None.
+            :param msg: Announcement description
+            :param title: Announcement title
+            :param itr: Discord interaction
+            :param channel: Channel to send the announcement
         """
         self.logger.info(
             f'{itr.user.display_name} announced: Title - {title} | Message - {msg}')
         embed = discord.Embed(title=title, description=msg,
                               color=discord.Color.from_str(DOURADINHOS_COLOR))
         embed.set_author(name='DouraBot', icon_url=DOURADINHOS_AVATAR)
-        if thumbnail != None:
+        if thumbnail is not None:
             embed.set_thumbnail(url=thumbnail)
         await channel.send(content="@everyone", embed=embed)
         await itr.response.send_message('Announcement made!')
@@ -70,4 +72,4 @@ class admin(commands.Cog):
 
 
 async def setup(client: commands.Bot) -> None:
-    await client.add_cog(admin(client))
+    await client.add_cog(Admin(client))

@@ -5,7 +5,7 @@ from database import DatabaseManager
 from discord.ui import View, Button
 from logic.utilities import get_persistent_message, insert_persistent_message
 from discord import ButtonStyle
-from cogs.configs import get_config
+from cogs.configs import get_config_value
 
 
 class LinkButton(Button):
@@ -33,7 +33,7 @@ class Mods(commands.Cog):
     async def on_ready(self):
         with DatabaseManager().get_connection() as conn:
             channel = self.client.get_channel(
-                get_config("ASSETO_CORSA_MODS_MSG_CHANNEL"))
+                get_config_value("ASSETO_CORSA_MODS_MSG_CHANNEL"))
             message = get_persistent_message(conn, "mods_message")
             if message is None:
                 insert_persistent_message(conn, "mods_message")
