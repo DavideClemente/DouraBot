@@ -48,6 +48,7 @@ class Client(commands.Bot):
         self.logger.info(f'Bot connected to Discord')
 
     async def on_member_join(self, member: discord.Member):
+        await member.add_roles(discord.utils.get(member.guild.roles, id=settings.ROLES))
         with DatabaseManager().get_connection() as conn:
             user_number = get_next_user_number(conn)
             self.logger.info(
