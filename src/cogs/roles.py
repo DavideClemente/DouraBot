@@ -2,6 +2,7 @@
 import discord
 from websockets import Data
 import settings
+from cogs.configs import get_config_value
 from database import DatabaseManager
 from discord.ext import commands
 from discord.ui import Button, View
@@ -94,7 +95,7 @@ class Roles(commands.Cog):
         view = View(timeout=None)
         view.add_item(RoleButton())
         self.client.add_view(view)
-        channel = self.client.get_channel(settings.ROLES_CHANNEL)
+        channel = self.client.get_channel(get_config_value('ROLES_MESSAGE_CHANNEL'))#settings.ROLES_CHANNEL)
         with DatabaseManager().get_connection() as conn:
             message = get_persistent_message(conn, "roles_message")
             if message is None:

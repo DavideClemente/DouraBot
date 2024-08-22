@@ -17,7 +17,7 @@ def rating_to_stars(rating: float):
     return "⭐" * full_stars + ("½" if half_star else "")
 
 
-def ifNoneThenString(value):
+def if_none_then_empty_string(value):
     return value if value is not None else ""
 
 

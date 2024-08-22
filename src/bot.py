@@ -8,6 +8,7 @@ import os
 from database import DatabaseManager
 from logic.images import create_welcome_image, get_image, get_image_db
 from logic.users import insert_user, get_next_user_number
+from cogs.configs import get_config, get_config_value
 logger = settings.get_logger()
 
 
@@ -17,8 +18,7 @@ class Client(commands.Bot):
         self.cogsFolder = settings.COGS_PATH
         DatabaseManager().create_pool()
         self.setup_db()
-        super().__init__(command_prefix=commands.when_mentioned_or(
-            '??'), intents=discord.Intents().all())
+        super().__init__(command_prefix=commands.when_mentioned_or('??'), intents=discord.Intents().all())
 
     async def on_ready(self):
         self.logger.info(f'User: {self.user} (ID: {self.user.id})')
@@ -28,7 +28,7 @@ class Client(commands.Bot):
             f'Synced {len(synced)} commands: {[s.name for s in synced]}')
 
     async def setup_hook(self):
-        skips = []
+        skips = ['__init__']
         for filename in os.listdir(self.cogsFolder):
             cog_path = os.path.join(self.cogsFolder, filename)
             # Skip directories
@@ -48,24 +48,30 @@ class Client(commands.Bot):
         self.logger.info(f'Bot connected to Discord')
 
     async def on_member_join(self, member: discord.Member):
-        with DatabaseManager().get_connection() as conn:
-            user_number = get_next_user_number(conn)
-            self.logger.info(
-                f'User number {user_number} assigned to {member.display_name}')
-            insert_user(conn,
-                        member.id, member.display_name, user_number)
-            avatar = member.avatar.url
-            avatar_img = get_image(avatar)
-            avatar_img = avatar_img.resize((150, 150))
-            bck_image = get_image_db(
-                conn, 'background_welcome')
+        if settings.ENVIRONMENT != 'DEV':
+            try:
+                await member.add_roles(get_config_value('DEFAULT_ROLE'))
+            except Exception as e:
+                self.logger.error(
+                    f'Error assigning default role to {member.display_name}, reason - {e}')
+            with DatabaseManager().get_connection() as conn:
+                user_number = get_next_user_number(conn)
+                self.logger.info(
+                    f'User number {user_number} assigned to {member.display_name}')
+                insert_user(conn,
+                            member.id, member.display_name, user_number)
+                avatar = member.avatar.url
+                avatar_img = get_image(avatar)
+                avatar_img = avatar_img.resize((150, 150))
+                bck_image = get_image_db(
+                    conn, 'background_welcome')
 
-        result = create_welcome_image(
-            member.display_name, user_number, avatar_img, bck_image)
-        file = discord.File(result, filename='image.jpg')
+            result = create_welcome_image(
+                member.display_name, user_number, avatar_img, bck_image)
+            file = discord.File(result, filename='image.jpg')
 
-        await self.get_channel(settings.WELCOME_CHANNEL).send(content=f"Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!", file=file)
-        self.logger.info(f'{member.display_name} has joined the server')
+            await self.get_channel(settings.WELCOME_CHANNEL).send(content=f"Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!", file=file)
+            self.logger.info(f'{member.display_name} has joined the server')
 
     async def on_member_remove(self, member: discord.Member):
         self.logger.info(f'{member.display_name} has left the server')
