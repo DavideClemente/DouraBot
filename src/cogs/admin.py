@@ -8,9 +8,9 @@ from logic.utilities import is_role_allowed
 import re
 
 
-def remove_ansi_escape_codes(text):
+def remove_ansi_escape_codes(lines):
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    return ansi_escape.sub('', text)
+    return '\n'.join(ansi_escape.sub('', line) for line in lines)
 
 
 class Admin(commands.Cog):
@@ -27,13 +27,16 @@ class Admin(commands.Cog):
         self.logger.info(
             f'User {interaction.user.display_name} called show_logs')
         await interaction.response.defer()
-        multiline_string = "############## LOGS ##############"
+        message = "```"
+        message += "############## LOGS ##############"
         lineList = ""
         with open(settings.LOG_FILE_PATH, "r") as file:
             lines_list = file.readlines()
             last_lines = lines_list[-lines:]
-            lineList += '\n'.join(remove_ansi_escape_codes(last_lines))
-        await interaction.followup.send(f'{multiline_string}\n>>> {lineList}')
+            lineList += remove_ansi_escape_codes(last_lines)
+            message += "\n" + lineList
+        message += "```"
+        await interaction.followup.send(message)
 
     @show_logs.error
     async def show_logs_error(self, interaction: discord.Interaction, error):
@@ -41,6 +44,10 @@ class Admin(commands.Cog):
             self.logger.info(
                 f'User {interaction.user.display_name} tried calling show_logs')
             await interaction.response.send_message('Not allowed!', ephemeral=True)
+        else:
+            self.logger.error(
+                f'Error in show_logs: {error}')
+            await interaction.response.send_message('An error occurred!', ephemeral=True)
 
     @app_commands.command(name='announce', description='announce a message to the server')
     @app_commands.checks.cooldown(2, 5 * 60)

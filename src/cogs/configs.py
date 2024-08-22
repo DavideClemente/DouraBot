@@ -44,7 +44,8 @@ class RoleSelect(RoleSelect):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            update_config(self.config_key, self.values[0].id, self.values[0].name)
+            update_config(self.config_key,
+                          self.values[0].id, self.values[0].name)
             return await interaction.response.send_message("Config Updated", ephemeral=True)
         except Exception as e:
             return await interaction.response.send_message(f"Error: {e}", ephemeral=True)
@@ -135,17 +136,21 @@ class Configs(commands.Cog):
         view = ConfigView(self.client)
         await itr.response.send_message("Select a config to change", view=view, ephemeral=True)
 
-    @app_commands.command(name='get_config', description="Get a config value in the bot")
+    @app_commands.command(name='get_configs', description="Get all config values in the bot")
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
-    async def get_config(self, itr: discord.Interaction, key_name: str):
+    async def get_configs(self, itr: discord.Interaction):
         """Get a config value in the bot
 
         Args:
             itr (discord.Interaction): _description_
         """
         await itr.response.defer()
-        config = get_config(key_name.upper())
-        await itr.followup.send(content=f'⚙️ {key_name.upper()} => VALUE({config[0]}) || DESCRIPTION({config[1]}) ⚙️', ephemeral=True)
+        configs = get_configs()
+        config_message = "```"
+        for key, _, description in configs:
+            config_message += f"{key} => {description}\n"
+        config_message += "```"
+        await itr.followup.send(content=config_message, ephemeral=True)
 
     @app_commands.command(name='add_config', description="ADD a config value to the bot")
     @is_role_allowed(ROLES['DOURADINHO_GOD'], ROLES['DOURADINHO_MESTRE'], ROLES['DEV'])
@@ -185,6 +190,14 @@ def get_config(key_name):
         params = (key_name,)
         l_cursor.execute(query, params)
         return l_cursor.fetchall()[0]
+
+
+def get_configs():
+    with DatabaseManager().get_connection() as l_conn:
+        l_cursor = l_conn.cursor()
+        query = "SELECT KEY_NAME, VALUE, DESCRIPTION FROM CONFIGS"
+        l_cursor.execute(query)
+        return l_cursor.fetchall()
 
 
 def get_config_value(key_name):
