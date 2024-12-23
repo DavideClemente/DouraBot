@@ -40,10 +40,11 @@ class xmas(commands.Cog):
         persons_dict = locals().copy()
         persons_dict.pop('interaction')
         persons_dict.pop('description')
+        persons_dict.pop('self')
         participants = [i for i in persons_dict.values() if i is not None]
         list_order = gifts_order(participants)
-        modal = SecretSantaModal()
-        await interaction.response.send_modal(modal)
+        # modal = SecretSantaModal()
+        # await interaction.response.send_modal(modal)
         await self.send_individual_messages(interaction, description, list_order)
         await interaction.followup.send("Sent messages. Check logs for possible errors")
 
