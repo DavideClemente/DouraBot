@@ -379,7 +379,7 @@ class Music(commands.Cog):
             if not self.is_playing:
                 # If paused, just add to queue
                 if self.voice_client and self.voice_client.is_paused():
-                    embed = create_playing_embed("Added to queue", itr.user, song)
+                    embed = create_playing_embed("Added to queue", itr.user, song_info)
                     msg2 = await itr.followup.send(embed=embed)
                     await delete_message(msg2)
                 else:
@@ -389,7 +389,7 @@ class Music(commands.Cog):
             # Otherwise, just add it to the queue
             else:
                 embed = create_playing_embed(
-                    "Added to queue", itr.user, song)
+                    "Added to queue", itr.user, song_info)
                 msg2 = await itr.followup.send(embed=embed)
                 await delete_message(msg2)
 
