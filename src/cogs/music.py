@@ -335,6 +335,7 @@ class Music(commands.Cog):
     async def play(self, itr: discord.Interaction, song: str = None):
         """Plays a requested song
 
+
         Args:
             :param itr: Discord interaction
             :param song:  The song you want to play
