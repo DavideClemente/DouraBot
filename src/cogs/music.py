@@ -1,14 +1,24 @@
 import asyncio
-from asyncio import run_coroutine_threadsafe
-import discord
-import settings
-from discord.ext import commands
-from discord import app_commands
-from yt_dlp import YoutubeDL
-from urllib import parse, request
-from concurrent.futures import ThreadPoolExecutor
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from urllib import parse, request
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+from yt_dlp import YoutubeDL
+
+from random import shuffle
+import settings
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import subprocess
+
+sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
+    client_id=settings.SPOTIFY_CLIENT_ID,
+    client_secret=settings.SPOTIFY_CLIENT_SECRET
+))
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -55,6 +65,50 @@ async def add_reactions(msg: discord.Message):
 async def delete_message(msg: discord.Message):
     await asyncio.sleep(5)
     await msg.delete()
+
+
+def is_spotify_url(url):
+    return "open.spotify.com" in url or "spotify.com" in url
+
+
+def get_spotify_track_info(url):
+    track = sp.track(url)
+    title = track['name']
+    artist = track['artists'][0]['name']
+    return f"{title} {artist}"
+
+
+def is_spotify_playlist(url):
+    return "playlist" in url
+
+
+def is_spotify_album(url):
+    return "album" in url
+
+
+def get_spotify_url_data(url):
+    """Convert Spotify URL to YouTube URL
+
+    Args:
+        url (str): Spotify URL
+
+    Returns:
+        str: YouTube URL
+    """
+
+    if is_spotify_playlist(url):
+        playlist_id = url.split("/")[-1].split("?")[0]
+        raw_results = sp.playlist_items(playlist_id, market='PT')
+        results = [f"{track['track']['name']} {track['track']['artists'][0]['name']}" for track in raw_results['items']]
+    elif is_spotify_album(url):
+        album_id = url.split("/")[-1].split("?")[0]
+        album_tracks = sp.album_tracks(album_id)
+        results = [
+            f"{track['name']} {track['artists'][0]['name']}" for track in album_tracks['items']
+        ]
+    else:
+        results = [get_spotify_track_info(url)]
+    return results
 
 
 class Music(commands.Cog):
@@ -421,13 +475,14 @@ class Music(commands.Cog):
                     ]
 
     @app_commands.command(name='play', description="play a song")
-    async def play(self, itr: discord.Interaction, song: str = None):
+    async def play(self, itr: discord.Interaction, song: str = None, shuffle_music: bool = False):
         """Plays a requested song
 
 
         Args:
             :param itr: Discord interaction
             :param song:  The song you want to play
+            :param shuffle_music: Shuffle the playlist (if any)
         """
         await itr.response.defer()
         channel = itr.channel
@@ -450,20 +505,37 @@ class Music(commands.Cog):
 
         # Url or search params found
         else:
-            # Check if music found
-            search_results = await self.search_youtube(song)
-            if not search_results:
-                msg = await itr.followup.send('❌ Could not find the song ❌')
-                await delete_message(msg)
-                return
+            song_info = []
+            if is_spotify_url(song):
+                results = get_spotify_url_data(song)
 
-            song_info = await self.extract_youtube(search_results[0])
-            if not song_info:
-                await itr.followup.send('❌ Could not play the song ❌')
-                return
+                async def process_song(query):
+                    search_results_local = await self.search_youtube(query)
+                    if not search_results_local:
+                        return None
+                    si = await self.extract_youtube(search_results_local[0])
+                    return si[0] if si else None
+
+                tasks = [process_song(query) for query in results]
+                song_info_list = await asyncio.gather(*tasks)
+                song_info = [s for s in song_info_list if s is not None]
+            else:
+                # Check if music found
+                search_results = await self.search_youtube(song)
+                if not search_results:
+                    msg = await itr.followup.send('❌ Could not find the song ❌')
+                    await delete_message(msg)
+                    return
+
+                song_info = await self.extract_youtube(search_results[0])
+                if not song_info:
+                    await itr.followup.send('❌ Could not play the song ❌')
+                    return
 
             user_channel = itr.user.voice.channel
             # Add music to queue
+            if shuffle_music:
+                shuffle(song_info)
             for song in song_info:
                 self.queue.append({'song': song, 'channel': user_channel})
             await channel.send(f'📜 Added {len(song_info)} songs to the queue 📜')
@@ -516,7 +588,7 @@ class Music(commands.Cog):
         try:
             next_songs = self.queue[self.queue_index + 1:self.queue_index + 10]
             song_list = [
-                f'{i+1}. [{song["song"]["title"]}]({song["song"]["link"]})'
+                f'{i + 1}. [{song["song"]["title"]}]({song["song"]["link"]})'
                 for i, song in enumerate(next_songs)
             ]
             songs_text = "\n".join(song_list)

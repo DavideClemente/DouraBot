@@ -35,3 +35,5 @@ jobs:
           DOURADINHOS=${{ vars.DOURADINHOS }}
           CURRENCY_API_KEY=${{ vars.CURRENCY_API_KEY }}
           CLOUDFLARE_WORKER=${{ vars.CLOUDFLARE_WORKER }}
+          SPOTIFY_CLIENT_ID=${{ vars.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET=${{ vars.SPOTIFY_CLIENT_SECRET }}
