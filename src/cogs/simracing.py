@@ -1,15 +1,14 @@
 import discord
-import settings
-from discord.ext import commands
 from discord import app_commands
-from settings import ROLES
-from logic.utilities import is_role_allowed
+from discord.ext import commands
+
+import settings
 
 
 class SimRacing(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
-        self.logger = logger
+        self.logger = settings.logger
 
     @app_commands.command(name='calculate_fuel_time', description="Calculate the fuel needed for a race based on the total time")
     async def calculate_fuel_time(self, itr: discord.Interaction, total_time: int, lap_time: str, fuel_per_lap: float):
