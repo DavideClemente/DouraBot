@@ -30,7 +30,7 @@ class SimRacing(commands.Cog):
 
         total_fuel = math.ceil(laps * fuel_per_lap)
         # Calculate recommended fuel by adding a 5% safety margin
-        recommended_fuel = math.ceil(min_fuel * 1.05)
+        recommended_fuel = math.ceil(total_fuel * 1.05)
 
         await itr.response.send_message(f"Minimum fuel needed for the race: {total_fuel:.2f} liters ⛽.\nRecommended fuel: {recommended_fuel} liters ⚠️")
 
@@ -47,7 +47,7 @@ class SimRacing(commands.Cog):
 
         total_fuel = math.ceil(laps * fuel_per_lap)
         # Calculate recommended fuel by adding a 5% safety margin
-        recommended_fuel = math.ceil(min_fuel * 1.05)
+        recommended_fuel = math.ceil(total_fuel * 1.05)
 
         await itr.response.send_message(
             f"Minimum fuel needed for the race: {total_fuel:.2f} liters ⛽.\nRecommended fuel: {recommended_fuel} liters ⚠️")
