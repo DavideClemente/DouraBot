@@ -31,16 +31,18 @@ jobs:
     - name: Bump version
       id: bump
       run: |
-        latest=${{ steps.get_tag.outputs.latest_tag }}
+        latest="${{ steps.get_tag.outputs.latest_tag }}"
         if [[ -z "$latest" ]]; then
-          echo "new_tag=v1.0.0" >> $GITHUB_OUTPUT
+          new_tag="v1.0.0"
         else
           version=${latest#v}
           IFS='.' read -r major minor patch <<< "$version"
           patch=$((patch + 1))
           new_tag="v$major.$minor.$patch"
         fi
+        echo "new_tag=$new_tag"
         echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
+
 
     - name: Create new tag
       env:
