@@ -37,7 +37,7 @@ class SimRacing(commands.Cog):
             lap_time_seconds = minutes * 60 + seconds
 
             total_time_seconds = total_time * 60
-            laps = math.ceil(total_time_seconds / lap_time_seconds)
+            laps = ceil(total_time_seconds / lap_time_seconds)
 
             total_fuel = laps * fuel_per_lap_float
             recommended_fuel = ceil(total_fuel + (fuel_per_lap_float * 1.5))
