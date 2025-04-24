@@ -37,8 +37,8 @@ jobs:
           IFS='.' read -r major minor patch <<< "$version"
           patch=$((patch + 1))
           new_tag="v$major.$minor.$patch"
-          echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
         fi
+        echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
     - name: Create new tag
       env:
