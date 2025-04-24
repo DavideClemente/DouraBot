@@ -69,7 +69,6 @@ jobs:
         push: true
         tags: |
           davide2707clemente/dourabot:latest
-          davide2707clemente/dourabot:${{steps.bump.new_tag}}
         platforms: linux/amd64,linux/arm64
         build-args: |
           TOKEN_PROD=${{ vars.TOKEN_PROD }}
