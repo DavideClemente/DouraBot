@@ -50,7 +50,7 @@ jobs:
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
-        git tag ${{ env.new_tag }}
+        git tag ${{ steps.bump.new_tag }}
         git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
         git push origin ${{ env.new_tag }}
 
@@ -68,7 +68,7 @@ jobs:
         push: true
         tags: |
           davide2707clemente/dourabot:latest
-          davide2707clemente/dourabot:${{env.new_tag}}
+          davide2707clemente/dourabot:${{steps.bump.new_tag}}
         platforms: linux/amd64,linux/arm64
         build-args: |
           TOKEN_PROD=${{ vars.TOKEN_PROD }}
