@@ -1,7 +1,8 @@
+from math import ceil
+
 import discord
 from discord import app_commands
 from discord.ext import commands
-import math
 
 import settings
 
@@ -27,7 +28,7 @@ class SimRacing(commands.Cog):
         :param itr: Discord interaction
         :param total_time: Race length in minutes
         :param lap_time: Lap time in mm:ss
-        :param fuel_per_lap: Fuel consumption per lap in liters e.g. 2,5
+        :param fuel_per_lap: Fuel consumption per lap in liters e.g. 2.5
         :return: Recommended fuel in liters
         """
         try:
@@ -65,7 +66,7 @@ class SimRacing(commands.Cog):
         Calculate the fuel needed for a race based on the total laps
         :param itr: Discord interaction
         :param laps: Race laps
-        :param fuel_per_lap: Fuel consumption per lap in liters e.g. 2,5
+        :param fuel_per_lap: Fuel consumption per lap in liters e.g. 2.5
         :return: Recommended fuel in liters
         """
 
