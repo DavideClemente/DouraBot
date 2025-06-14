@@ -47,11 +47,10 @@ CARS_LINK = 'https://drive.google.com/drive/folders/1FaIDOQ2L2jpUzsatK1CmBlR77Bq
 TRACKS_LINK = 'https://drive.google.com/drive/folders/1DUxemFJuFimWt3OqGI-3pCdq99Vv0L2i?usp=drive_link'
 APPS_LINK = 'https://drive.google.com/drive/folders/18rLa9etKzhzrpVfz4rzYCJ5h7tEDwNbC?usp=drive_link'
 
+# ACC LINKS
+ACC_STATUS_API = 'https://acc-status.jonatan.net/api/v2/acc/status'
 
-# ASSETO CORSA LINKS
-CARS_LINK = 'https://drive.google.com/drive/folders/1FaIDOQ2L2jpUzsatK1CmBlR77BqyhUIJ?usp=drive_link'
-TRACKS_LINK = 'https://drive.google.com/drive/folders/1DUxemFJuFimWt3OqGI-3pCdq99Vv0L2i?usp=drive_link'
-APPS_LINK = 'https://drive.google.com/drive/folders/18rLa9etKzhzrpVfz4rzYCJ5h7tEDwNbC?usp=drive_link'
+
 # PATHS
 LOG_FILE_PATH = os.path.join('logs', 'logs.log')
 COGS_PATH = os.path.join('src', 'cogs')

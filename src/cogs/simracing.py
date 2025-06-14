@@ -1,8 +1,11 @@
 from math import ceil
 
 import discord
+import requests
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
+from logic.messages import get_latest_message_id_by_channel_id, delete_message_by_id, insert_message
+from cogs.configs import get_config_value
 
 import settings
 
@@ -19,6 +22,59 @@ class SimRacing(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.logger
+        self.check_acc_status.start()
+
+    def cog_unload(self) -> None:
+        self.logger.info("SimRacing cog unloaded")
+
+    @tasks.loop(minutes=6)
+    async def check_acc_status(self):
+        url: str = settings.ACC_STATUS_API
+        channel_id: str = get_config_value('ACC_SERVER_STATUS')
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            status = data.get("status")
+            color = discord.Color.green() if status == 1 else discord.Color.red()
+
+            embed = discord.Embed(
+                title="Assetto Corsa Competizione Server Status",
+                timestamp=discord.utils.utcnow(),
+                color=color
+            )
+
+            if status == 1:
+                embed.add_field(name="Status", value="✅ Servers are UP!", inline=False)
+                embed.add_field(name="Ping", value=f"{data.get('ping')} ms", inline=True)
+                embed.add_field(name="Public Servers", value=f"{data.get('servers')}", inline=True)
+                embed.add_field(name="Players Online", value=f"{data.get('players')}", inline=True)
+            elif status == 0:
+                embed.add_field(name="Status", value="❌ Servers are DOWN!", inline=False)
+                embed.add_field(name="Down Since", value=f"{data.get('down_since')}", inline=False)
+            else:
+                embed.add_field(name="Status", value="⚠️ Unknown server status", inline=False)
+
+            channel = self.client.get_channel(int(channel_id))
+            if channel:
+                last_message_id = get_latest_message_id_by_channel_id(channel_id)
+                if last_message_id:
+                    last_message = await channel.fetch_message(last_message_id)
+                    if last_message:
+                        await last_message.edit(embed=embed)
+                        delete_message_by_id(last_message_id)
+                        insert_message('acc_status', last_message_id, channel_id)
+                        return
+                else:
+                    new_message = await channel.send(embed=embed, silent=True)
+                    insert_message('acc_status', new_message.id, channel_id)
+        except Exception as e:
+            self.logger.error("Error checking ACC status:", e)
+
+    @check_acc_status.before_loop
+    async def before_check_acc_status(self):
+        await self.client.wait_until_ready()
 
     @app_commands.command(name='calculate_fuel_time',
                           description="Calculate the fuel needed for a race based on the total time")
