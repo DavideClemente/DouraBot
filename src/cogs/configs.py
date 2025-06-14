@@ -159,6 +159,10 @@ class Configs(commands.Cog):
 
         Args:
             itr (discord.Interaction): _description_
+            :param itr:
+            :param description: Config description
+            :param value: Config value
+            :param key_name: Config key name
         """
         await itr.response.defer()
         view = MyView(key_name, value, description)
@@ -169,7 +173,7 @@ def save_config(key_name, value, description, conf_type):
     with DatabaseManager().get_connection() as l_conn:
         l_cursor = l_conn.cursor()
         query = "INSERT INTO CONFIGS (KEY_NAME, VALUE, DESCRIPTION, TYPE) VALUES (%s, %s, %s, %s)"
-        params = (value, description, key_name, conf_type)
+        params = (key_name, value, description, conf_type)
         l_cursor.execute(query, params)
         l_conn.commit()
 
@@ -207,6 +211,15 @@ def get_config_value(key_name):
         params = (key_name,)
         l_cursor.execute(query, params)
         return l_cursor.fetchall()[0][0]
+
+
+def delete_config(key_name):
+    with DatabaseManager().get_connection() as l_conn:
+        l_cursor = l_conn.cursor()
+        query = "DELETE FROM CONFIGS WHERE KEY_NAME = %s"
+        params = (key_name,)
+        l_cursor.execute(query, params)
+        l_conn.commit()
 
 
 async def setup(client: commands.Bot) -> None:

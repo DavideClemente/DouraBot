@@ -45,5 +45,6 @@ class Mods(commands.Cog):
                 self.logger.info("Mods message already exists")
 
 
+
 async def setup(client: commands.Bot) -> None:
     await client.add_cog(Mods(client))
