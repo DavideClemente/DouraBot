@@ -52,10 +52,10 @@ def hex_to_rgba(hex_color: str):
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (255,)
 
 
-def create_dourabot_embed(title: str, description: str = "", color: str = settings.DOURADINHOS_COLOR):
+def create_dourabot_embed(title: str, description: str = "", color: str = settings.DOURADINHOS_COLOR, thumbnail_url: str = settings.DOURADINHOS_IMAGE):
     embed = discord.Embed(title=title, description=description, color=discord.Color.from_str(color))
     embed.set_author(name="DouraBot", icon_url=settings.DOURADINHOS_AVATAR)
-    embed.set_thumbnail(url=settings.DOURADINHOS_IMAGE)
+    embed.set_thumbnail(url=thumbnail_url)
     return embed
 
 

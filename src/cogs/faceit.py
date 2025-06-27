@@ -1,27 +1,30 @@
-from lib2to3.pgen2.tokenize import group
+import warnings
+
+import discord
+from discord import app_commands
+from discord.ext import commands
 from faceit import Faceit
 from faceit.constants import GameID
 
-import discord
-
 import settings
 from logic.utilities import create_dourabot_embed, country_code_to_flag, get_country_name
-from discord.ext import commands
-from discord import app_commands
+
+warnings.filterwarnings("ignore",
+                        message="No model defined for this response. Validation and model parsing are unavailable.")
 
 
 class FaceitCog(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.logger
-        self.faceit = Faceit().data()
+        self.faceit = Faceit.data(f"{settings.FACEIT_API_KEY}")
 
     group = app_commands.Group(name="faceit", description="Faceit commands")
 
     @group.command(name="profile", description="Get Faceit profile information")
     async def profile(self, interaction: discord.Interaction, username: str) -> None:
         """Get Faceit profile information by username."""
-
+        await interaction.response.defer()
         player = self.faceit.players.get(username)
         stats = self.faceit.players.stats(player.id, GameID.CS2)
         history = self.faceit.players.all_history(player.id, GameID.CS2)
@@ -60,12 +63,7 @@ class FaceitCog(commands.Cog):
 
         embed.set_footer(text="Data powered by FACEIT API")
 
-        await ctx.send(embed=embed)
-
-        await interaction.response.send_message(
-            f"Profile information for {username} is not implemented yet.",
-            ephemeral=True
-        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(client: commands.Bot) -> None:
