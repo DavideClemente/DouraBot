@@ -197,6 +197,7 @@ class FaceitCog(commands.Cog):
                 my_team, team_id = get_player_team(player.nickname, match.teams)
                 won = winner == my_team
                 result = "✅ Win" if won else "❌ Loss"
+                faceit_url = match.faceit_url.__str__()
 
                 match_stats = self.get_match_stats(match.id)
                 match_map = self.get_match_map(match_stats)
@@ -209,7 +210,10 @@ class FaceitCog(commands.Cog):
                 field_title = f"🗺️ {match_map} - {time}"
                 field_value = f"{result} | **Score:** {score} | **KD:** {kd}"  # Ideally replace with real score
 
-                embed.add_field(name=field_title, value=field_value, inline=False)
+                embed.add_field(name="", value=field_title, inline=True)
+                embed.add_field(name="", value=field_value, inline=False)
+                embed.add_field(name="", value=f"Match Link - [Click here]({faceit_url})", inline=False)
+                embed.add_field(name="", value="" + "-" * 50, inline=False)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
         except APIError as e:
