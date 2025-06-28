@@ -2,6 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
+import pycountry
+import settings
 
 
 def is_role_allowed(*roles):
@@ -48,3 +50,27 @@ def insert_persistent_message(db, event):
 def hex_to_rgba(hex_color: str):
     hex_color = hex_color.lstrip('0x#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (255,)
+
+
+def create_dourabot_embed(title: str, description: str = "", color: str = settings.DOURADINHOS_COLOR, thumbnail_url: str = settings.DOURADINHOS_IMAGE):
+    embed = discord.Embed(title=title, description=description, color=discord.Color.from_str(color))
+    embed.set_author(name="DouraBot", icon_url=settings.DOURADINHOS_AVATAR)
+    embed.set_thumbnail(url=thumbnail_url)
+    return embed
+
+
+def country_code_to_flag(country_code: str) -> str:
+    """
+    Converts a 2-letter country code (e.g., 'US', 'PT') to the corresponding emoji flag.
+    """
+    return ''.join(
+        chr(127397 + ord(char))
+        for char in country_code.upper()
+    )
+
+
+def get_country_name(country_code: str) -> str:
+    try:
+        return pycountry.countries.get(alpha_2=country_code.upper()).name
+    except AttributeError:
+        return country_code  # fallback if code is invalid or unknown

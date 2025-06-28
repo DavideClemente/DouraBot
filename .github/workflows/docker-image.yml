@@ -77,3 +77,4 @@ jobs:
           CLOUDFLARE_WORKER=${{ vars.CLOUDFLARE_WORKER }}
           SPOTIFY_CLIENT_ID=${{ vars.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET=${{ vars.SPOTIFY_CLIENT_SECRET }}
+          FACEIT_API_KEY=${{ secrets.FACEIT_API_KEY }}
