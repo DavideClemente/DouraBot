@@ -7,13 +7,6 @@ from logic.utilities import hex_to_rgba
 from database import DatabaseManager
 
 
-def create_circle(size):
-    mask = Image.new('L', (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((0, 0, size, size), fill=255)
-    return mask
-
-
 def get_image(url: str):
     response = requests.get(url)
     return Image.open(BytesIO(response.content)).convert('RGBA')
@@ -34,7 +27,7 @@ def create_circle(diameter):
     return mask
 
 
-def create_welcome_image(username, user_number, profile: Image.Image, background: Image.Image):
+def create_welcome_image(username: str, user_number: str, profile: Image.Image, background: Image.Image) -> BytesIO:
     mask = create_circle(profile.height)
     profile.putalpha(mask)
 

@@ -15,11 +15,11 @@ logger = settings.get_logger()
 def setup_db():
     with DatabaseManager().get_connection() as conn:
         cur = conn.cursor()
-        commands = ""
+        instructions = ""
         with open(os.path.join('db', 'sql_init.sql'), 'r') as file:
             content = file.read()
-            commands = content.split(';')
-        for cmd in commands:
+            instructions = content.split(';')
+        for cmd in instructions:
             try:
                 cmd = cmd.strip()
                 if len(cmd) > 0:
@@ -43,12 +43,11 @@ O nosso bot personalizado, **DouraBot**, está cá para te ajudar! Começa por u
 Diverte-te e aproveita o servidor! 🚀
 """
 
+
 class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
-        DatabaseManager().create_pool()
-        setup_db()
         super().__init__(command_prefix=commands.when_mentioned_or('??'), intents=discord.Intents().all())
 
     async def on_ready(self):
@@ -57,6 +56,8 @@ class Client(commands.Bot):
         synced = await self.tree.sync(guild=settings.DISCORD_GUILD)
         self.logger.info(
             f'Synced {len(synced)} commands: {[s.name for s in synced]}')
+        DatabaseManager().create_pool()
+        setup_db()
 
     async def setup_hook(self):
         skips = ['__init__']
@@ -93,9 +94,7 @@ class Client(commands.Bot):
                     f'User number {user_number} assigned to {member.display_name}')
                 insert_user(conn,
                             member.id, member.display_name, user_number)
-                avatar = member.avatar.url
-                avatar_img = get_image(avatar)
-                avatar_img = avatar_img.resize((150, 150))
+                avatar_img: PIL.Image = await self.get_avatar_img_from_url(member)
                 bck_image = get_image_db(
                     conn, 'background_welcome')
 
@@ -105,6 +104,12 @@ class Client(commands.Bot):
 
             await self.get_channel(settings.WELCOME_CHANNEL).send(content=create_welcome_message(member), file=file)
             self.logger.info(f'{member.display_name} has joined the server')
+
+    async def get_avatar_img_from_url(self, member: discord.Member) -> PIL.Image:
+        avatar = member.avatar.url
+        avatar_img = get_image(avatar)
+        avatar_img = avatar_img.resize((150, 150))
+        return avatar_img
 
     async def on_member_remove(self, member: discord.Member):
         self.logger.info(f'{member.display_name} has left the server')

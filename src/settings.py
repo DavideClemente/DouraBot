@@ -72,12 +72,8 @@ api_key = os.getenv("CURRENCY_API_KEY")
 CURRENCY_API = f'https://api.freecurrencyapi.com/v1/latest?apikey={api_key}'
 CARD_API = 'https://www.deckofcardsapi.com/api'
 
-# Configure the root logger
 
-# Clear the log file
-with open(LOG_FILE_PATH, 'w') as f:
-    pass
-
+# Configure the logger
 logging.basicConfig(level=logging.INFO,
                     filename=LOG_FILE_PATH,
                     datefmt='%Y-%m-%d %H:%M:%S',

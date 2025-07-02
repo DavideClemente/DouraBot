@@ -54,7 +54,7 @@ class MySelectView(View):
         api_response_json = requests.get(
             f'{settings.CURRENCY_API}&currencies={self.toCurrency}&base_currency={self.fromCurrency}').json()
 
-        if (api_response_json['data'] is not None):
+        if api_response_json['data'] is not None:
             data = api_response_json['data']
             return await interaction.response.edit_message(view=None, content=f'🪙 Result: {self.amount} {self.fromCurrency} = {round(self.amount * float(data[self.toCurrency]), 2)} {self.toCurrency} 🪙')
         else:

@@ -115,8 +115,8 @@ class MyView(View):
         try:
             save_config(self.key_name, self.value, self.description, self.type)
             return await interaction.response.send_message("Config Added", ephemeral=True)
-        except:
-            return await interaction.response.send_message("Error while adding config", ephemeral=True)
+        except Exception as e:
+            return await interaction.response.send_message(f"Error while adding config - {e}", ephemeral=True)
 
 
 class Configs(commands.Cog):
@@ -131,7 +131,7 @@ class Configs(commands.Cog):
         """Change a config value in the bot
 
         Args:
-            itr (discord.Interaction): _description_
+            itr (discord.Interaction): Discord interaction
         """
         view = ConfigView(self.client)
         await itr.response.send_message("Select a config to change", view=view, ephemeral=True)
