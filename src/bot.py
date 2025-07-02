@@ -12,12 +12,43 @@ from cogs.configs import get_config, get_config_value
 logger = settings.get_logger()
 
 
+def setup_db():
+    with DatabaseManager().get_connection() as conn:
+        cur = conn.cursor()
+        commands = ""
+        with open(os.path.join('db', 'sql_init.sql'), 'r') as file:
+            content = file.read()
+            commands = content.split(';')
+        for cmd in commands:
+            try:
+                cmd = cmd.strip()
+                if len(cmd) > 0:
+                    cur.execute(cmd.strip())
+            except mysql.connector.DatabaseError as e:
+                print(f'Skipped command, reason - {e}')
+        conn.commit()
+
+
+def create_welcome_message(member: discord.Member):
+    return f"""
+Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!
+
+Começa por aqui:
+🎮 **Escolhe os teus jogos** 
+Vai até ao canal <#{settings.ROLES_CHANNEL}> e atribui-te os jogos que jogas — isso vai desbloquear canais específicos para cada jogo.
+
+🤖 **Conhece o DouraBot**  
+O nosso bot personalizado, **DouraBot**, está cá para te ajudar! Começa por usar `/` para veres os comandos disponíveis.
+
+Diverte-te e aproveita o servidor! 🚀
+"""
+
 class Client(commands.Bot):
     def __init__(self):
         self.logger = logger
         self.cogsFolder = settings.COGS_PATH
         DatabaseManager().create_pool()
-        self.setup_db()
+        setup_db()
         super().__init__(command_prefix=commands.when_mentioned_or('??'), intents=discord.Intents().all())
 
     async def on_ready(self):
@@ -50,7 +81,9 @@ class Client(commands.Bot):
     async def on_member_join(self, member: discord.Member):
         if settings.ENVIRONMENT != 'DEV':
             try:
-                await member.add_roles(get_config_value('DEFAULT_ROLE'))
+                role = get_config_value('DEFAULT_ROLE')
+                await member.add_roles(role)
+                self.logger.info(f'Added {role} role to {member}')
             except Exception as e:
                 self.logger.error(
                     f'Error assigning default role to {member.display_name}, reason - {e}')
@@ -70,27 +103,11 @@ class Client(commands.Bot):
                 member.display_name, user_number, avatar_img, bck_image)
             file = discord.File(result, filename='image.jpg')
 
-            await self.get_channel(settings.WELCOME_CHANNEL).send(content=f"Olá {member.mention}, bem vindo/a ao servidor dos **DOURADINHOS**!", file=file)
+            await self.get_channel(settings.WELCOME_CHANNEL).send(content=create_welcome_message(member), file=file)
             self.logger.info(f'{member.display_name} has joined the server')
 
     async def on_member_remove(self, member: discord.Member):
         self.logger.info(f'{member.display_name} has left the server')
-
-    def setup_db(self):
-        with DatabaseManager().get_connection() as conn:
-            cur = conn.cursor()
-            commands = ""
-            with open(os.path.join('db', 'sql_init.sql'), 'r') as file:
-                content = file.read()
-                commands = content.split(';')
-            for cmd in commands:
-                try:
-                    cmd = cmd.strip()
-                    if len(cmd) > 0:
-                        cur.execute(cmd.strip())
-                except mysql.connector.DatabaseError as e:
-                    print(f'Skipped command, reason - {e}')
-            conn.commit()
 
 
 def log_unhandled_exception(exc_type, exc_value, exc_traceback):
