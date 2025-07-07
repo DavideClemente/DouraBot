@@ -9,7 +9,7 @@ from faceit.exceptions import APIError
 import requests
 
 import settings
-from logic.utilities import create_dourabot_embed, country_code_to_flag, get_country_name
+from logic.utilities import create_dourabot_embed, country_code_to_flag, get_country_name, bold_msg
 
 FACEIT_MAP_NAMES = {
     "de_inferno": "Inferno",
@@ -207,7 +207,7 @@ class FaceitCog(commands.Cog):
                 embed.add_field(name="", value=field_title, inline=True)
                 embed.add_field(name="", value=field_value, inline=False)
                 embed.add_field(name="", value=f"Match Link - Click [here]({faceit_url})", inline=False)
-                embed.add_field(name="", value="**-**" * 50, inline=False)
+                embed.add_field(name="", value=bold_msg("-"*50), inline=False)
                 if i < 4:
                     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
