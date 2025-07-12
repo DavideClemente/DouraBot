@@ -4,7 +4,7 @@ import settings
 from discord.ext import commands
 from discord import app_commands
 from settings import DEV_CHANNEL, DOURADINHOS_AVATAR, GENERAL_CHANNEL, ROLES, DOURADINHOS_COLOR
-from logic.utilities import is_role_allowed
+from logic.utilities import is_role_allowed, create_dourabot_embed
 import re
 
 
@@ -64,12 +64,8 @@ class Admin(commands.Cog):
         """
         self.logger.info(
             f'{itr.user.display_name} announced: Title - {title} | Message - {msg}')
-        embed = discord.Embed(title=title, description=msg,
-                              color=discord.Color.from_str(DOURADINHOS_COLOR))
-        embed.set_author(name='DouraBot', icon_url=DOURADINHOS_AVATAR)
-        if thumbnail is not None:
-            embed.set_thumbnail(url=thumbnail)
-        await channel.send(content="@everyone", embed=embed)
+        embed = create_dourabot_embed(title=title, description=msg.replace('\\n', '\n'))
+        await channel.send(embed=embed)
         await itr.response.send_message('Announcement made!')
 
     @announce.error
