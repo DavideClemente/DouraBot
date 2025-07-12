@@ -9,7 +9,7 @@ from faceit.exceptions import APIError
 import requests
 
 import settings
-from logic.utilities import create_dourabot_embed, country_code_to_flag, get_country_name
+from logic.utilities import create_dourabot_embed, country_code_to_flag, get_country_name, bold_msg
 
 FACEIT_MAP_NAMES = {
     "de_inferno": "Inferno",
@@ -20,9 +20,9 @@ FACEIT_MAP_NAMES = {
     "de_ancient": "Ancient",
     "de_anubis": "Anubis",
     "de_dust2": "Dust II",
+    "de_train": "Train",
     "cs_italy": "Italy",
     "cs_office": "Office",
-    # Add more if needed
 }
 
 warnings.filterwarnings("ignore",
@@ -31,14 +31,10 @@ warnings.filterwarnings("ignore",
 
 def get_player_team(player_nickname: str, teams: list) -> dict:
     """
-    Determine which team the player belongs to based on their ID.
-
-    Args:
-        player_id (str): The ID of the player.
-        teams (list): A list of team objects, each containing player IDs.
-
-    Returns:
-        dict: The team object the player belongs to, or None if not found.
+    Get the team of a player by their nickname.
+    :param player_nickname:
+    :param teams:
+    :return:
     """
     for team in teams:
         if player_nickname in [player.nickname for player in team[1].players]:
@@ -141,7 +137,7 @@ class FaceitCog(commands.Cog):
             cs2_stats = stats.get('lifetime')
             cs2 = player.games.get(GameID.CS2)
 
-            embed = create_dourabot_embed(title="FACEIT Profile Info")
+            embed = create_dourabot_embed(title=f"{username} FACEIT Profile Info", thumbnail_url=player.avatar.__str__())
 
             embed.add_field(name="NickName",
                             value=player.nickname,
@@ -190,9 +186,9 @@ class FaceitCog(commands.Cog):
                 await interaction.followup.send("No match history found for this player.", ephemeral=True)
                 return
 
-            embed = discord.Embed(title="🕹️ Last 5 Matches", color=0xFFA500)
+            embed = create_dourabot_embed(title=f"🕹️ {username} Last 5 Matches", thumbnail_url=player.avatar.__str__())
 
-            for match in history[:5]:
+            for i, match in enumerate(history[:5]):
                 winner = match.results.winner
                 my_team, team_id = get_player_team(player.nickname, match.teams)
                 won = winner == my_team
@@ -203,17 +199,19 @@ class FaceitCog(commands.Cog):
                 match_map = self.get_match_map(match_stats)
                 score = self.get_match_result(match_stats, won)
                 kd = self.get_match_kd(match_stats, team_id.id, player.id)
-                #is_mvp = max(team_kills) == player_kills
-
                 time = f"<t:{match.started_at}:R>"
 
-                field_title = f"🗺️ {match_map} - {time}"
-                field_value = f"{result} | **Score:** {score} | **KD:** {kd}"  # Ideally replace with real score
+                field_title = f"🗺️ **{match_map}** - {time}"
+                field_value = f"{result} | Score: {score} | KD: {kd}"  # Ideally replace with real score
 
                 embed.add_field(name="", value=field_title, inline=True)
                 embed.add_field(name="", value=field_value, inline=False)
-                embed.add_field(name="", value=f"Match Link - [Click here]({faceit_url})", inline=False)
-                embed.add_field(name="", value="" + "-" * 50, inline=False)
+                embed.add_field(name="", value=f"Match Link - Click [here]({faceit_url})", inline=False)
+                embed.add_field(name="", value=bold_msg("-"*50), inline=False)
+                if i < 4:
+                    embed.add_field(name="\u200b", value="\u200b", inline=False)
+
+            embed.set_footer(text="Data powered by FACEIT API")
 
             await interaction.followup.send(embed=embed, ephemeral=True)
         except APIError as e:
