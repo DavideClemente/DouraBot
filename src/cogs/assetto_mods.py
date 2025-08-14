@@ -8,12 +8,7 @@ from discord import ButtonStyle
 from cogs.configs import get_config_value
 
 
-class LinkButton(Button):
-    def __init__(self, label: str, url: str):
-        super().__init__(style=ButtonStyle.link, label=label, url=url)
-
-
-class MyView(View):
+class ButtonsView(View):
     def __init__(self):
         super().__init__()
         self.add_item(Button(style=ButtonStyle.link, label='Cars',
@@ -37,13 +32,12 @@ class Mods(commands.Cog):
             message = get_persistent_message(conn, "mods_message")
             if message is None:
                 insert_persistent_message(conn, "mods_message")
-                with open('assets/asseto_cover.jpg', 'rb') as file:
-                    await channel.send("**Asseto Corsa Mods**",
+                with open('assets/assetto_cover.jpg', 'rb') as file:
+                    await channel.send("**Assetto Corsa Mods**",
                                        file=discord.File(file),
-                                       view=MyView())
+                                       view=ButtonsView())
             else:
                 self.logger.info("Mods message already exists")
-
 
 
 async def setup(client: commands.Bot) -> None:

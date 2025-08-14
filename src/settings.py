@@ -50,6 +50,8 @@ APPS_LINK = 'https://drive.google.com/drive/folders/18rLa9etKzhzrpVfz4rzYCJ5h7tE
 
 # ACC LINKS
 ACC_STATUS_API = 'https://acc-status.jonatan.net/api/v2/acc/status'
+ACC_DRIVE_SETUPS = 'https://drive.google.com/drive/folders/10jyRYEfEUzG9YwCI_IE5Arel5mKqLIzA?usp=drive_link'
+JARDIER_SETUPS = 'https://jaroslavhonzik.com/setups/assetto_corsa_competizione/'
 
 
 # PATHS
