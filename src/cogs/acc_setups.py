@@ -12,9 +12,9 @@ class ButtonsView(View):
     def __init__(self):
         super().__init__()
         self.add_item(Button(style=ButtonStyle.link, label='Setups',
-                             url=settings.CARS_LINK, emoji='🔧'))
+                             url=settings.ACC_DRIVE_SETUPS, emoji='🔧'))
         self.add_item(Button(style=ButtonStyle.link, label='Jardier',
-                             url=settings.TRACKS_LINK, emoji='🏁'))
+                             url=settings.JARDIER_SETUPS, emoji='🏁'))
 
 
 class Setups(commands.Cog):
@@ -25,8 +25,8 @@ class Setups(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         with DatabaseManager().get_connection() as conn:
-            channel = self.client.get_channel(
-                get_config_value("ACC_SETUPS_MSG_CHANNEL"))
+            config_value = int(get_config_value("ACC_SETUPS_MSG_CHANNEL"))
+            channel = self.client.get_channel(config_value)
             message = get_persistent_message(conn, "acc_setups_message")
             if message is None:
                 insert_persistent_message(conn, "acc_setups_message")

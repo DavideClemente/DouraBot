@@ -27,8 +27,8 @@ class Mods(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         with DatabaseManager().get_connection() as conn:
-            channel = self.client.get_channel(
-                get_config_value("ASSETO_CORSA_MODS_MSG_CHANNEL"))
+            config_value = int(get_config_value("ASSETO_CORSA_MODS_MSG_CHANNEL"))
+            channel = self.client.get_channel(config_value)
             message = get_persistent_message(conn, "mods_message")
             if message is None:
                 insert_persistent_message(conn, "mods_message")
