@@ -204,7 +204,7 @@ def get_configs():
         return l_cursor.fetchall()
 
 
-def get_config_value(key_name):
+def get_config_value(key_name) -> str:
     with DatabaseManager().get_connection() as l_conn:
         l_cursor = l_conn.cursor()
         query = "SELECT VALUE FROM CONFIGS WHERE KEY_NAME = %s"
