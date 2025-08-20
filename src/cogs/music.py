@@ -21,7 +21,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
 ))
 
 ytdl_format_options = {
-    'format': 'bestaudio/best',
+    #'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
     'nocheckcertificate': True,
@@ -32,8 +32,7 @@ ytdl_format_options = {
     'no_warnings': True,
     'default_search': 'auto',
     # bind to ipv4 since ipv6 addresses cause issues sometimes
-    'source_address': '0.0.0.0',
-    'extract_flat': True
+    'source_address': '0.0.0.0'
 }
 
 ffmpeg_options = {
@@ -42,7 +41,43 @@ ffmpeg_options = {
 }
 
 
+def _pick_thumbnail(info: dict) -> str | None:
+    if info.get("thumbnail"):
+        return info["thumbnail"]
+    thumbs = info.get("thumbnails") or []
+    if thumbs:
+        best = max(thumbs, key=lambda t: (t.get("width") or 0, t.get("height") or 0))
+        return best.get("url")
+    return None
+
+
+def _pick_best_stream(info: dict) -> str | None:
+    fmts = info.get("formats") or []
+    if not fmts:
+        return None
+    # Prefer audio-only
+    audio_only = [f for f in fmts if f.get("vcodec") == "none" and f.get("acodec") not in (None, "none")]
+    # 1) Opus/WebM
+    opus = [f for f in audio_only if f.get("acodec") == "opus" or f.get("ext") == "webm"]
+    if opus:
+        return max(opus, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
+    # 2) M4A/MP4 (HLS audio like itag 233/234)
+    m4a = [f for f in audio_only if f.get("ext") in ("m4a", "mp4")]
+    if m4a:
+        return max(m4a, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
+    # 3) Any audio-only
+    if audio_only:
+        return max(audio_only, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
+    # 4) Any A/V that includes audio
+    av = [f for f in fmts if f.get("acodec") not in (None, "none")]
+    if av:
+        return max(av, key=lambda f: (f.get("tbr") or 0, f.get("abr") or 0)).get("url")
+    return None
+
+
 def create_playing_embed(title, author: discord.User, song):
+    if not song:  # Check if the song list is empty
+        raise ValueError("The song list is empty. Cannot create an embed.")
     if type(song) is list:
         song = song[0]
     embed = discord.Embed(title=title,
@@ -444,56 +479,96 @@ class Music(commands.Cog):
 
         return results[:1]
 
-    async def extract_youtube(self, url):
+    async def extract_youtube(self, url: str):
         loop = asyncio.get_event_loop()
-        with YoutubeDL(ytdl_format_options) as yt:
+
+        # Build and use YoutubeDL **inside** the worker thread
+        def run():
+            # Toggle noplaylist depending on URL type
+            opts = {**ytdl_format_options}
+            is_playlist = "list=" in url and "watch?v=" not in url
+            opts["noplaylist"] = not is_playlist  # True for single video, False for real playlists
+            # Optional: you can also set a format preference; we still do manual picking below.
+            # opts["format"] = "bestaudio/best"
+
+            with YoutubeDL(opts) as yt:
+                return yt.extract_info(url, download=False)
+
+        try:
+            info = await loop.run_in_executor(self.executor, run)
+        except Exception as e:
+            self.logger.error(f"Error extracting YouTube info: {e}")
+            return None
+
+        if not info:
+            return None
+
+        # If it's a playlist (or a search that returned entries), return all items with source=None
+        if "entries" in info or info.get("_type") == "playlist":
+            entries = info.get("entries") or []
+            results = []
+            for entry in entries:
+                if not entry:
+                    continue
+                results.append({
+                    "link": entry.get("webpage_url") or entry.get("url") or url,
+                    "thumbnail": _pick_thumbnail(entry),
+                    "original_url": entry.get("original_url") or entry.get("webpage_url") or entry.get("url") or url,
+                    "source": None,  # resolve later, right before playback
+                    "title": entry.get("title"),
+                })
+            return results or None
+
+        # Single video
+        v = info
+        stream = v.get("url") or _pick_best_stream(v)
+
+        # Final fallback: try a broader format pick if needed
+        if not stream:
+            def run_best():
+                opts = {**ytdl_format_options, "noplaylist": True, "format": "best"}
+                with YoutubeDL(opts) as yt:
+                    return yt.extract_info(v.get("webpage_url") or url, download=False)
+
             try:
-                info = await loop.run_in_executor(self.executor, yt.extract_info, url, False)
+                alt = await loop.run_in_executor(self.executor, run_best)
+                if alt:
+                    stream = alt.get("url") or _pick_best_stream(alt)
+                    if stream:
+                        v = alt
             except Exception as e:
-                return None
+                self.logger.warning(f"Fallback extract failed: {e}")
 
-            if '_type' not in info or info['_type'] == 'video':
-                return [{
-                    'link': 'https://www.youtube.com/watch?v=' + url,
-                    'thumbnail': info['thumbnails'][0]['url'],
-                    'original_url:': info['original_url'],
-                    'source': info['url'],
-                    'title': info['title']
-                }]
+        if not stream:
+            self.logger.warning("No playable stream found")
+            return None
 
-                # If it's a playlist, return all entries
-            if info['_type'] == 'playlist':
-                # If it's a playlist, return all entries
-                if info['_type'] == 'playlist':
-                    return [
-                        {
-                            'link': entry['url'],
-                            'thumbnail': entry['thumbnails'][0]['url'],
-                            'original_url': entry['url'],
-                            'source': None,
-                            'title': entry['title']
-                        }
-                        for entry in info['entries'] if entry
-                    ]
+        return [{
+            "link": v.get("webpage_url") or url,
+            "thumbnail": _pick_thumbnail(v),
+            "original_url": v.get("original_url") or v.get("webpage_url") or url,
+            "source": stream,  # pass to FFmpegPCMAudio
+            "title": v.get("title"),
+        }]
 
-    @app_commands.command(name='play', description="play a song")
-    async def play(self, itr: discord.Interaction, song: str = None, shuffle_music: bool = False):
+    @app_commands.command(name='play', description="play a song or playlist")
+    async def play(self, itr: discord.Interaction, search: str = None, shuffle_music: bool = False):
         """Plays a requested song
 
 
         Args:
             :param itr: Discord interaction
-            :param song:  The song you want to play
+            :param search:  The song you want to play
             :param shuffle_music: Shuffle the playlist (if any)
         """
         await itr.response.defer()
         channel = itr.channel
-        self.logger.info(f'User {itr.user.display_name} called play/{song}')
+        self.logger.info(f'User {itr.user.display_name} called play/{search}')
         if not itr.user.voice:
             await itr.followup.send('⚠️ You need to be connected to a voice channel ⚠️')
 
         # Play the musics in the queue
-        if song is None:
+        if search is None:
             if self.is_queue_empty():
                 await itr.followup.send('❌ There are no songs to be played in the queue ❌')
                 return
@@ -508,8 +583,9 @@ class Music(commands.Cog):
         # Url or search params found
         else:
             song_info = []
-            if is_spotify_url(song):
-                results = get_spotify_url_data(song)
+            if is_spotify_url(search):
+                self.logger.info(f'Spotify URL found: {search}')
+                results = get_spotify_url_data(search)
 
                 async def process_song(query):
                     search_results_local = await self.search_youtube(query)
@@ -523,7 +599,8 @@ class Music(commands.Cog):
                 song_info = [s for s in song_info_list if s is not None]
             else:
                 # Check if music found
-                search_results = await self.search_youtube(song)
+                search_results = await self.search_youtube(search)
+                self.logger.info(f'Youtube Search results: {search_results}')
                 if not search_results:
                     msg = await itr.followup.send('❌ Could not find the song ❌')
                     await delete_message(msg)
@@ -538,8 +615,8 @@ class Music(commands.Cog):
             # Add music to queue
             if shuffle_music:
                 shuffle(song_info)
-            for song in song_info:
-                self.queue.append({'song': song, 'channel': user_channel})
+            for search in song_info:
+                self.queue.append({'song': search, 'channel': user_channel})
             await channel.send(f'📜 Added {len(song_info)} songs to the queue 📜')
 
             # If not active playing, play the music
