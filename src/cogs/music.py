@@ -35,6 +35,20 @@ ytdl_format_options = {
     'source_address': '0.0.0.0'
 }
 
+FAST_PLAYLIST_OPTS = {
+    **ytdl_format_options,
+    "noplaylist": False,              # allow playlist container
+    "extract_flat": "in_playlist",    # <-- key speedup: don't resolve each entry
+    "skip_download": True,
+}
+
+SINGLE_OPTS = {
+    **ytdl_format_options,
+    "noplaylist": True,               # only a single video
+    "format": "bestaudio/best",
+}
+
+
 ffmpeg_options = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn -b:a 256k'
@@ -369,6 +383,23 @@ class Music(commands.Cog):
             self.queue_index += 1
             self.is_playing = False
 
+    async def resolve_stream(self, watch_url: str) -> str | None:
+        loop = asyncio.get_event_loop()
+
+        def run():
+            from yt_dlp import YoutubeDL
+            with YoutubeDL(SINGLE_OPTS) as yt:
+                return yt.extract_info(watch_url, download=False)
+
+        try:
+            info = await loop.run_in_executor(self.executor, run)
+        except Exception as e:
+            self.logger.warning(f"resolve_stream failed: {e}")
+            return None
+        if not info:
+            return None
+        return info.get("url") or _pick_best_stream(info)
+
     def play_audio(self, user, song):
         def play_next_callback(e):
             asyncio.run_coroutine_threadsafe(self.play_next(user), self.client.loop)
@@ -376,7 +407,7 @@ class Music(commands.Cog):
         async def play_audio_thread():
             source_url = song['source']
             if source_url is None:
-                info = await self.extract_youtube(song['original_url'])
+                info = await self.resolve_stream(song['original_url'])
                 source_url = info[0]['source']
             self.voice_client.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(
                 source_url, **ffmpeg_options), volume=0.5), after=play_next_callback)
@@ -442,103 +473,113 @@ class Music(commands.Cog):
         else:
             await itr.response.send_message('ℹ️ **DouraBot** is not in a voice channel ℹ️')
 
-    async def search_youtube(self, search: str):
-        """Searches YouTube for results based on url or search params
-
-        Args:
-            search (str): Url/ Search Params
-
-        Returns:
-            _type_: YouTube results
-        """
+    async def search_youtube(self, q: str):
+        if "youtube.com/" in q or "youtu.be/" in q or "playlist?list=" in q:
+            return [q]
         loop = asyncio.get_event_loop()
 
-        # If it's a valid Youtube URL, return it
-        if "youtube.com/watch?v=" in search or "youtu.be/" in search:
-            return [search]
+        def run():
+            from yt_dlp import YoutubeDL
+            with YoutubeDL({"quiet": True, "noplaylist": True}) as yt:
+                return yt.extract_info(f"ytsearch1:{q}", download=False)
 
-        # If it's a playlist, return directly
-        if "youtube.com/playlist?list=" in search:
-            return [search]
+        info = await loop.run_in_executor(self.executor, run)
+        e = (info.get("entries") or [None])[0] if info else None
+        return [e.get("webpage_url")] if e else []
 
-        # Otherwise, search for the song
-        query_string = parse.urlencode({'search_query': search})
-        content = await loop.run_in_executor(self.executor,
-                                             request.urlopen, f'https://www.youtube.com/results?{query_string}')
-        content = content.read().decode()
-
-        # Detect video and playlist results
-        video_results = re.findall(r'/watch\?v=(.{11})', content)
-        playlist_results = re.findall(r'/playlist\?list=([a-zA-Z0-9_-]+)', content)
-
-        results = []
-        if video_results:
-            results.append(f"https://www.youtube.com/watch?v={video_results[0]}")
-        if playlist_results:
-            results.append(f"https://www.youtube.com/playlist?list={playlist_results[0]}")
-
-        return results[:1]
+    # async def search_youtube(self, search: str):
+    #     """Searches YouTube for results based on url or search params
+    #
+    #     Args:
+    #         search (str): Url/ Search Params
+    #
+    #     Returns:
+    #         _type_: YouTube results
+    #     """
+    #     loop = asyncio.get_event_loop()
+    #
+    #     # If it's a valid Youtube URL, return it
+    #     if "youtube.com/watch?v=" in search or "youtu.be/" in search:
+    #         return [search]
+    #
+    #     # If it's a playlist, return directly
+    #     if "youtube.com/playlist?list=" in search:
+    #         return [search]
+    #
+    #     # Otherwise, search for the song
+    #     query_string = parse.urlencode({'search_query': search})
+    #     content = await loop.run_in_executor(self.executor,
+    #                                          request.urlopen, f'https://www.youtube.com/results?{query_string}')
+    #     content = content.read().decode()
+    #
+    #     # Detect video and playlist results
+    #     video_results = re.findall(r'/watch\?v=(.{11})', content)
+    #     playlist_results = re.findall(r'/playlist\?list=([a-zA-Z0-9_-]+)', content)
+    #
+    #     results = []
+    #     if video_results:
+    #         results.append(f"https://www.youtube.com/watch?v={video_results[0]}")
+    #     if playlist_results:
+    #         results.append(f"https://www.youtube.com/playlist?list={playlist_results[0]}")
+    #
+    #     return results[:1]
 
     async def extract_youtube(self, url: str):
         loop = asyncio.get_event_loop()
 
-        # Build and use YoutubeDL **inside** the worker thread
-        def run():
-            # Toggle noplaylist depending on URL type
-            opts = {**ytdl_format_options}
-            is_playlist = "list=" in url and "watch?v=" not in url
-            opts["noplaylist"] = not is_playlist  # True for single video, False for real playlists
-            # Optional: you can also set a format preference; we still do manual picking below.
-            # opts["format"] = "bestaudio/best"
-
+        def run_fast_or_single():
+            # Treat pure playlist URLs as playlists; watch URLs stay single
+            is_playlist = ("playlist?list=" in url) or ("list=" in url and "watch?v=" not in url)
+            opts = FAST_PLAYLIST_OPTS if is_playlist else SINGLE_OPTS
+            from yt_dlp import YoutubeDL
             with YoutubeDL(opts) as yt:
                 return yt.extract_info(url, download=False)
 
         try:
-            info = await loop.run_in_executor(self.executor, run)
+            info = await loop.run_in_executor(self.executor, run_fast_or_single)
         except Exception as e:
             self.logger.error(f"Error extracting YouTube info: {e}")
             return None
-
         if not info:
             return None
 
-        # If it's a playlist (or a search that returned entries), return all items with source=None
+        # Playlist: flat entries — super fast; defer stream resolution
         if "entries" in info or info.get("_type") == "playlist":
-            entries = info.get("entries") or []
-            results = []
-            for entry in entries:
-                if not entry:
+            items = []
+            for e in info.get("entries") or []:
+                if not e:
                     continue
-                results.append({
-                    "link": entry.get("webpage_url") or entry.get("url") or url,
-                    "thumbnail": _pick_thumbnail(entry),
-                    "original_url": entry.get("original_url") or entry.get("webpage_url") or entry.get("url") or url,
-                    "source": None,  # resolve later, right before playback
-                    "title": entry.get("title"),
+                # Flat entries may give id/ie_key; build a stable watch URL
+                page_url = e.get("webpage_url") or e.get("url")
+                if page_url and page_url.startswith("http"):
+                    link = page_url
+                else:
+                    vid = e.get("id") or page_url
+                    link = f"https://www.youtube.com/watch?v={vid}"
+                items.append({
+                    "link": link,
+                    "thumbnail": _pick_thumbnail(e),
+                    "original_url": link,
+                    "source": None,  # resolve later (right before play)
+                    "title": e.get("title"),
                 })
-            return results or None
+            return items or None
 
-        # Single video
+        # Single video: resolve a playable URL now
         v = info
         stream = v.get("url") or _pick_best_stream(v)
-
-        # Final fallback: try a broader format pick if needed
         if not stream:
+            # fallback: try "best"
             def run_best():
-                opts = {**ytdl_format_options, "noplaylist": True, "format": "best"}
-                with YoutubeDL(opts) as yt:
+                from yt_dlp import YoutubeDL
+                with YoutubeDL({**SINGLE_OPTS, "format": "best"}) as yt:
                     return yt.extract_info(v.get("webpage_url") or url, download=False)
 
-            try:
-                alt = await loop.run_in_executor(self.executor, run_best)
-                if alt:
-                    stream = alt.get("url") or _pick_best_stream(alt)
-                    if stream:
-                        v = alt
-            except Exception as e:
-                self.logger.warning(f"Fallback extract failed: {e}")
-
+            alt = await loop.run_in_executor(self.executor, run_best)
+            if alt:
+                stream = alt.get("url") or _pick_best_stream(alt)
+                if stream:
+                    v = alt
         if not stream:
             self.logger.warning("No playable stream found")
             return None
@@ -547,7 +588,7 @@ class Music(commands.Cog):
             "link": v.get("webpage_url") or url,
             "thumbnail": _pick_thumbnail(v),
             "original_url": v.get("original_url") or v.get("webpage_url") or url,
-            "source": stream,  # pass to FFmpegPCMAudio
+            "source": stream,
             "title": v.get("title"),
         }]
 
