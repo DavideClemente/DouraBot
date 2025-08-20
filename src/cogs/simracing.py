@@ -29,6 +29,10 @@ class SimRacing(commands.Cog):
 
     @tasks.loop(minutes=6)
     async def check_acc_status(self):
+        if settings.ENVIRONMENT == 'DEV':
+            self.logger.info("Skipping ACC status check in DEV environment")
+            return
+
         url: str = settings.ACC_STATUS_API
         channel_id: str = get_config_value('ACC_SERVER_STATUS')
 

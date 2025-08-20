@@ -43,6 +43,8 @@ ffmpeg_options = {
 
 
 def create_playing_embed(title, author: discord.User, song):
+    if type(song) is list:
+        song = song[0]
     embed = discord.Embed(title=title,
                           description=f'[{song["title"]}]({song["link"]})',
                           color=discord.Color.from_str(
