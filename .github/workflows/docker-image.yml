@@ -78,3 +78,4 @@ jobs:
           SPOTIFY_CLIENT_ID=${{ vars.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET=${{ vars.SPOTIFY_CLIENT_SECRET }}
           FACEIT_API_KEY=${{ secrets.FACEIT_API_KEY }}
+          AIRPORTS_DB_KEY=${{ secrets.AIRPORTS_DB_KEY }}
