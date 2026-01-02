@@ -8,7 +8,7 @@
       <jdbc-url>jdbc:mariadb://mariadoura:3306/master</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="LocalMaria" uuid="b31cfda0-9b68-44de-ae70-15c4fbfbd3ba">
+    <data-source source="LOCAL" name="LocalHostMaria" uuid="b31cfda0-9b68-44de-ae70-15c4fbfbd3ba">
       <driver-ref>mariadb</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.mariadb.jdbc.Driver</jdbc-driver>
