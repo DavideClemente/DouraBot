@@ -137,7 +137,8 @@ async def add_reactions(msg: discord.Message):
     await asyncio.gather(
         msg.add_reaction('⏮️'),
         msg.add_reaction('⏯️'),
-        msg.add_reaction('⏭️')
+        msg.add_reaction('⏭️'),
+        msg.add_reaction('🔀')
     )
 
 
@@ -178,6 +179,8 @@ class Music(commands.Cog):
         self.last_played_msg = None
         self.me_id = self.client.user.id
         self.inactivity_timer: threading.Timer = None
+        self.shuffle_enabled = False
+        self._original_queue = None  # Store original queue order before shuffle
 
     async def clear(self):
         self.is_playing = False
@@ -267,6 +270,9 @@ class Music(commands.Cog):
             # Play/Pause
             elif reaction.emoji == '⏯️':
                 await self.reaction_play_pause(channel, reaction, user)
+            # Shuffle
+            elif reaction.emoji == '🔀':
+                await self.reaction_shuffle(channel, reaction, user)
 
     async def reaction_next(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
         msg = None
@@ -1139,6 +1145,39 @@ class Music(commands.Cog):
 
         msg = await itr.followup.send(f'⏭️ Skipped to song #{index}')
         await delete_message(msg)
+
+    async def reaction_shuffle(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
+        msg = None
+        if self.is_queue_empty():
+            msg = await channel.send("❌ The queue is empty ❌")
+        else:
+            self.shuffle_enabled = not self.shuffle_enabled
+
+            if self.shuffle_enabled:
+                # Save original queue order before shuffling
+                self._original_queue = self._queue.copy()
+                # Shuffle the remaining songs (everything after current)
+                if self.exists_next_song_in_queue():
+                    upcoming = self._queue[self.queue_index + 1:]
+                    shuffle(upcoming)
+                    self._queue[self.queue_index + 1:] = upcoming
+                    msg = await channel.send(f'🔀 Shuffle enabled by {user.display_name}')
+                else:
+                    msg = await channel.send(f'🔀 Shuffle enabled (no songs to shuffle) by {user.display_name}')
+            else:
+                # Restore original queue order
+                if self._original_queue:
+                    # Restore from saved position onwards
+                    self._queue[self.queue_index +
+                                1:] = self._original_queue[self.queue_index + 1:]
+                    self._original_queue = None
+                msg = await channel.send(f'➡️ Shuffle disabled by {user.display_name}')
+
+            await reaction.message.clear_reactions()
+            await add_reactions(reaction.message)
+
+        if msg:
+            await delete_message(msg)
 
 
 async def setup(client: commands.Bot) -> None:
