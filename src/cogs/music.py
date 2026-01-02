@@ -574,6 +574,24 @@ class Music(commands.Cog):
             return best.get("url")
         return None
 
+    async def prefetch_next_source(self):
+        """Resolve the next track's stream in advance to reduce start-up lag."""
+        if not self.exists_next_song_in_queue():
+            return
+        try:
+            nxt = self.queue[self.queue_index + 1]['song']
+        except Exception:
+            return
+        if nxt.get('source'):
+            return
+        try:
+            src = await self.resolve_stream(nxt['original_url'])
+            if src:
+                nxt['source'] = src
+        except Exception as exc:
+            self.logger.warning("Prefetch failed for %s: %s",
+                                nxt.get('original_url'), exc)
+
     def play_audio(self, user, song):
         def play_next_callback(e):
             asyncio.run_coroutine_threadsafe(
@@ -589,6 +607,8 @@ class Music(commands.Cog):
                     self.is_playing = False
                     await self.play_next(user, force=True)  # skip broken track
                     return
+            # remember resolved URL so replays or requeues avoid re-fetching
+            song['source'] = source_url
             try:
                 self.voice_client.play(discord.PCMVolumeTransformer(
                     discord.FFmpegPCMAudio(source_url, **ffmpeg_options), volume=0.5
@@ -597,6 +617,10 @@ class Music(commands.Cog):
                 self.logger.exception("Failed to start playback: %s", exc)
                 self.is_playing = False
                 await self.play_next(user, force=True)
+                return
+
+            # fire-and-forget prefetch of the upcoming track (if any)
+            self.client.loop.create_task(self.prefetch_next_source())
 
         self.client.loop.create_task(play_audio_thread())
 
