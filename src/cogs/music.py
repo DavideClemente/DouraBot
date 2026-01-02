@@ -169,7 +169,7 @@ class Music(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.get_logger()
-        self.queue = []
+        self._queue = []
         self.queue_index = 0
         self.is_playing = False
         self.is_connected = False
@@ -181,12 +181,12 @@ class Music(commands.Cog):
 
     async def clear(self):
         self.is_playing = False
-        self.queue = []
+        self._queue = []
         self.queue_index = 0
 
     async def disconnect(self):
         self.is_playing = False
-        self.queue = []
+        self._queue = []
         self.queue_index = 0
         await self.voice_client.disconnect()
         self.voice_client = None
@@ -195,7 +195,7 @@ class Music(commands.Cog):
         return self.voice_client is not None
 
     def exists_next_song_in_queue(self):
-        return self.queue_index + 1 < len(self.queue)
+        return self.queue_index + 1 < len(self._queue)
 
     def not_me(self, member: discord.Member):
         return member.id != self.client.user.id
@@ -218,26 +218,29 @@ class Music(commands.Cog):
     def clean_queue(self):
         # Remove the song if it is 3 places down the queue
         if self.queue_index > 2:
-            self.queue.pop(self.queue_index - 3)
+            self._queue.pop(self.queue_index - 3)
             self.queue_index -= 1  # Adjust index to keep it in sync
 
     def get_current_song_from_queue(self):
-        return self.queue[self.queue_index]['song']
+        return self._queue[self.queue_index]['song']
+
+    def get_current_from_queue(self):
+        return self._queue[self.queue_index]
 
     def get_previous_song(self):
-        return self.queue[
-            self.queue_index - 1]['song'] if len(self.queue) > 1 and self.queue_index >= 1 else None
+        return self._queue[
+            self.queue_index - 1]['song'] if len(self._queue) > 1 and self.queue_index >= 1 else None
 
     def is_queue_empty(self):
-        return len(self.queue) == 0
+        return len(self._queue) == 0
 
     def clear_queue_impl(self):
-        current_music = self.get_current_song_from_queue()
-        if self.queue_index > 0:
-            self.queue = [current_music]
+        current_music = self.get_current_from_queue()
+        if self.queue_index >= 0:
+            self._queue = [current_music]
             self.queue_index = 0
         else:
-            self.queue = []
+            self._queue = []
             self.queue_index = 0
 
     @commands.Cog.listener()
@@ -463,7 +466,7 @@ class Music(commands.Cog):
             "source": None,  # resolve right before playback
             "title": q0,  # use Spotify title/artist now; YouTube title will be resolved on play
         }
-        self.queue.append({"song": first_song, "channel": user_channel})
+        self._queue.append({"song": first_song, "channel": user_channel})
 
         # ---- 2) Background task: map the remaining tracks to YouTube and append
         async def fetch_rest_spotify():
@@ -480,7 +483,7 @@ class Music(commands.Cog):
                                    for it in entries if it and it.get("track")]
                         batch_songs = await self._resolve_queries_to_songs(queries, shuffle_music)
                         for s in batch_songs:
-                            self.queue.append(
+                            self._queue.append(
                                 {"song": s, "channel": user_channel})
                         added += len(batch_songs)
                         offset += page_size
@@ -495,7 +498,7 @@ class Music(commands.Cog):
                             f'{it["name"]} {it["artists"][0]["name"]}' for it in entries if it]
                         batch_songs = await self._resolve_queries_to_songs(queries, shuffle_music)
                         for s in batch_songs:
-                            self.queue.append(
+                            self._queue.append(
                                 {"song": s, "channel": user_channel})
                         added += len(batch_songs)
                         offset += page_size
@@ -579,7 +582,7 @@ class Music(commands.Cog):
         if not self.exists_next_song_in_queue():
             return
         try:
-            nxt = self.queue[self.queue_index + 1]['song']
+            nxt = self._queue[self.queue_index + 1]['song']
         except Exception:
             return
         if nxt.get('source'):
@@ -634,10 +637,10 @@ class Music(commands.Cog):
         Returns:
             _type_: _description_
         """
-        if self.queue_index < len(self.queue):
+        if self.queue_index < len(self._queue):
             self.is_playing = True
             channel = self.client.get_channel(channel_id)
-            await self.join_voice_channel(channel, self.queue[self.queue_index]['channel'])
+            await self.join_voice_channel(channel, self._queue[self.queue_index]['channel'])
             song = self.get_current_song_from_queue()
 
             if self.last_played_msg:
@@ -731,7 +734,7 @@ class Music(commands.Cog):
             "source": None,
             "title": first.get("title"),
         }
-        self.queue.append({"song": first_song, "channel": user_channel})
+        self._queue.append({"song": first_song, "channel": user_channel})
         added_count = 1
 
         # 2) Background task: fetch the rest ("2-" means from 2 to end) and append
@@ -761,7 +764,7 @@ class Music(commands.Cog):
 
                 # Extend queue on the event loop
                 for s in items:
-                    self.queue.append({"song": s, "channel": user_channel})
+                    self._queue.append({"song": s, "channel": user_channel})
 
                 if items:
                     await channel_to_notify.send(
@@ -899,7 +902,7 @@ class Music(commands.Cog):
                 await itr.followup.send('❌ Could not read this Spotify URL ❌')
                 return
             # First track was already enqueued by the progressive method
-            song_info = [self.queue[-1]['song']]
+            song_info = [self._queue[-1]['song']]
             already_enqueued_first = True
 
         # ---- Spotify single track (map to YouTube)
@@ -940,7 +943,7 @@ class Music(commands.Cog):
                 if added_now == 0:
                     await itr.followup.send('❌ Could not read this playlist ❌')
                     return
-                song_info = [self.queue[-1]['song']]
+                song_info = [self._queue[-1]['song']]
                 already_enqueued_first = True
 
             # Single YouTube video → extract now
@@ -957,7 +960,7 @@ class Music(commands.Cog):
 
         if not already_enqueued_first:
             for s in song_info:
-                self.queue.append({'song': s, 'channel': user_channel})
+                self._queue.append({'song': s, 'channel': user_channel})
 
         await channel.send(f'📜 Added {len(song_info)} song{"s" if len(song_info) != 1 else ""} to the queue 📜')
 
@@ -980,19 +983,8 @@ class Music(commands.Cog):
             msg2 = await itr.followup.send(embed=embed, silent=True)
             await delete_message(msg2)
 
-    @app_commands.command(name='queue', description="display the current queue")
-    async def queue(self, itr: discord.Interaction):
-        """Display the current queue
-
-        Args:
-            itr (discord.Interaction): Discord interaction
-        """
-        await itr.response.defer()
-
-        if self.is_queue_empty():
-            await itr.followup.send('ℹ️ There are no songs in the queue ℹ️', silent=True)
-            return
-
+    def _queue_embed(self, page: int, page_size: int) -> discord.Embed:
+        """Build a paginated queue embed with current/previous headers."""
         embed = discord.Embed(title="🎚️ Music queue 🎚️")
 
         previous = self.get_previous_song()
@@ -1009,22 +1001,92 @@ class Music(commands.Cog):
             value=f'[{current["title"]}]({current["link"]})',
             inline=False)
 
-        try:
-            next_songs = self.queue[self.queue_index + 1:self.queue_index + 10]
+        upcoming = self._queue[self.queue_index + 1:]
+        total_upcoming = len(upcoming)
+        total_pages = max(1, (total_upcoming + page_size - 1) // page_size)
+        page = max(0, min(page, total_pages - 1))
+        start = page * page_size
+        end = start + page_size
+        slice_items = upcoming[start:end]
+
+        if slice_items:
             song_list = [
-                f'{i + 1}. [{song["song"]["title"]}]({song["song"]["link"]})'
-                for i, song in enumerate(next_songs)
+                f'{self.queue_index + 1 + start + i}. [{entry["song"]["title"]}]({entry["song"]["link"]})'
+                for i, entry in enumerate(slice_items)
             ]
             songs_text = "\n".join(song_list)
-            if len(songs_text) > 1024:
-                # Ensure it doesn't exceed 1024
-                songs_text = songs_text[:1021] + "..."
+        else:
+            songs_text = "(no more songs queued)"
 
-            embed.add_field(name="PLAYING NEXT",
-                            value=songs_text, inline=False)
-        except Exception as e:
-            pass
-        await itr.followup.send(embed=embed, silent=True)
+        embed.add_field(name=f"PLAYING NEXT (page {page + 1}/{total_pages})",
+                        value=songs_text[:1021] +
+                        ("..." if len(songs_text) > 1021 else ""),
+                        inline=False)
+        return embed
+
+    class QueueView(discord.ui.View):
+        def __init__(self, cog: "Music", user: discord.User, page_size: int = 8):
+            super().__init__(timeout=120)
+            self.cog = cog
+            self.user = user
+            self.page_size = page_size
+            self.page = 0
+            self.total_pages = 1
+            self.update_buttons()
+
+        def update_buttons(self):
+            """Update button states based on current page."""
+            total_upcoming = len(self.cog._queue) - (self.cog.queue_index + 1)
+            self.total_pages = max(
+                1, (total_upcoming + self.page_size - 1) // self.page_size)
+            self.children[0].disabled = (self.page == 0)  # Prev
+            self.children[1].disabled = (
+                self.page == self.total_pages - 1)  # Next
+
+        async def update(self, interaction: discord.Interaction):
+            total_upcoming = len(self.cog._queue) - (self.cog.queue_index + 1)
+            total_pages = max(
+                1, (total_upcoming + self.page_size - 1) // self.page_size)
+            self.page = max(0, min(self.page, total_pages - 1))
+            self.total_pages = total_pages
+            self.update_buttons()
+            embed = self.cog._queue_embed(self.page, self.page_size)
+            await interaction.response.edit_message(embed=embed, view=self)
+
+        @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
+        async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.user.id:
+                await interaction.response.defer()
+                return
+            self.page -= 1
+            await self.update(interaction)
+
+        @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+        async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.user.id:
+                await interaction.response.defer()
+                return
+            self.page += 1
+            await self.update(interaction)
+
+        async def on_timeout(self):
+            for child in self.children:
+                if isinstance(child, discord.ui.Button):
+                    child.disabled = True
+
+    @app_commands.command(name='queue', description="display the current queue")
+    async def queue(self, itr: discord.Interaction):
+        """Display the current queue with pagination."""
+        await itr.response.defer()
+
+        if self.is_queue_empty():
+            await itr.followup.send('ℹ️ There are no songs in the queue ℹ️', silent=True)
+            return
+
+        view = self.QueueView(self, itr.user)
+        embed = self._queue_embed(page=0, page_size=view.page_size)
+        view.update_buttons()
+        await itr.followup.send(embed=embed, view=view, silent=True)
 
     @app_commands.command(name='clear_queue', description="clear the current queue")
     async def clear_queue(self, itr: discord.Interaction):
@@ -1036,6 +1098,46 @@ class Music(commands.Cog):
         await itr.response.defer()
         self.clear_queue_impl()
         msg = await itr.followup.send('🗑️ Queue cleared! 🗑️', silent=True)
+        await delete_message(msg)
+
+    @app_commands.command(name='skip_to', description="skip to a specific song in the queue")
+    async def skip_to(self, itr: discord.Interaction, index: int):
+        """Skip to a specific song by queue index
+
+        Args:
+            itr (discord.Interaction): Discord interaction
+            index (int): The queue index to skip to (0-based, as shown in queue)
+        """
+        await itr.response.defer()
+
+        if not self.voice_client:
+            await itr.followup.send("❌ Not connected to a voice channel ❌")
+            return
+
+        if self.is_queue_empty():
+            await itr.followup.send("❌ The queue is empty ❌")
+            return
+
+        # Validate index (0-based as shown in the queue)
+        if index < 0 or index >= len(self._queue):
+            await itr.followup.send(f"❌ Invalid index. Must be between 0 and {len(self._queue) - 1} ❌")
+            return
+
+        if index == self.queue_index:
+            await itr.followup.send("ℹ️ That song is already playing ℹ️")
+            return
+
+        # Jump to the specified index
+        self.queue_index = index - 1
+        if self.voice_client.is_playing() or self.voice_client.is_paused():
+            # Stop triggers play_next callback which will increment queue_index and play
+            self.voice_client.stop()
+        else:
+            # Not currently playing, manually start at target index
+            self.queue_index = index
+            await self.play_music(itr.channel.id, itr.user)
+
+        msg = await itr.followup.send(f'⏭️ Skipped to song #{index}')
         await delete_message(msg)
 
 
