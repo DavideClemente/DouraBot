@@ -21,7 +21,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
 ))
 
 ytdl_format_options = {
-    #'format': 'bestaudio/best',
+    # 'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
     'nocheckcertificate': True,
@@ -54,15 +54,19 @@ ffmpeg_options = {
     'options': '-vn -b:a 256k'
 }
 
+
 def _yt_watch_url(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
+
 
 def _yt_thumb(video_id: str) -> str:
     # safe default if yt-dlp entry lacks thumbnails
     return f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
 
+
 def _get_sp_playlist_id(url: str) -> str:
     return url.split("/")[-1].split("?")[0]
+
 
 def _get_sp_album_id(url: str) -> str:
     return url.split("/")[-1].split("?")[0]
@@ -73,7 +77,8 @@ def _pick_thumbnail(info: dict) -> str | None:
         return info["thumbnail"]
     thumbs = info.get("thumbnails") or []
     if thumbs:
-        best = max(thumbs, key=lambda t: (t.get("width") or 0, t.get("height") or 0))
+        best = max(thumbs, key=lambda t: (
+            t.get("width") or 0, t.get("height") or 0))
         return best.get("url")
     vid = info.get("id")
     return _yt_thumb(vid) if vid else None
@@ -84,9 +89,11 @@ def _pick_best_stream(info: dict) -> str | None:
     if not fmts:
         return None
     # Prefer audio-only
-    audio_only = [f for f in fmts if f.get("vcodec") == "none" and f.get("acodec") not in (None, "none")]
+    audio_only = [f for f in fmts if f.get(
+        "vcodec") == "none" and f.get("acodec") not in (None, "none")]
     # 1) Opus/WebM
-    opus = [f for f in audio_only if f.get("acodec") == "opus" or f.get("ext") == "webm"]
+    opus = [f for f in audio_only if f.get(
+        "acodec") == "opus" or f.get("ext") == "webm"]
     if opus:
         return max(opus, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
     # 2) M4A/MP4 (HLS audio like itag 233/234)
@@ -102,11 +109,13 @@ def _pick_best_stream(info: dict) -> str | None:
         return max(av, key=lambda f: (f.get("tbr") or 0, f.get("abr") or 0)).get("url")
     return None
 
+
 def _is_playlist_url(url: str) -> bool:
     # treat "pure" playlist links as playlists; 'watch?v=...' stays a single video
     return ("youtube.com/playlist?list=" in url) or (
         "list=" in url and "watch?v=" not in url
     )
+
 
 def create_playing_embed(title, author: discord.User, song):
     if not song:  # Check if the song list is empty
@@ -156,31 +165,6 @@ def is_spotify_album(url):
     return "album" in url
 
 
-def get_spotify_url_data(url):
-    """Convert Spotify URL to YouTube URL
-
-    Args:
-        url (str): Spotify URL
-
-    Returns:
-        str: YouTube URL
-    """
-
-    if is_spotify_playlist(url):
-        playlist_id = url.split("/")[-1].split("?")[0]
-        raw_results = sp.playlist_items(playlist_id, market='PT')
-        results = [f"{track['track']['name']} {track['track']['artists'][0]['name']}" for track in raw_results['items']]
-    elif is_spotify_album(url):
-        album_id = url.split("/")[-1].split("?")[0]
-        album_tracks = sp.album_tracks(album_id)
-        results = [
-            f"{track['name']} {track['artists'][0]['name']}" for track in album_tracks['items']
-        ]
-    else:
-        results = [get_spotify_track_info(url)]
-    return results
-
-
 class Music(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
@@ -219,7 +203,8 @@ class Music(commands.Cog):
     def start_inactivity_timer(self, minutes: int):
         if self.inactivity_timer:
             self.inactivity_timer.cancel()
-        self.inactivity_timer = threading.Timer(minutes * 60, self.run_disconnect_coroutine)
+        self.inactivity_timer = threading.Timer(
+            minutes * 60, self.run_disconnect_coroutine)
         self.inactivity_timer.start()
 
     def run_disconnect_coroutine(self):
@@ -250,6 +235,9 @@ class Music(commands.Cog):
         current_music = self.get_current_song_from_queue()
         if self.queue_index > 0:
             self.queue = [current_music]
+            self.queue_index = 0
+        else:
+            self.queue = []
             self.queue_index = 0
 
     @commands.Cog.listener()
@@ -360,10 +348,10 @@ class Music(commands.Cog):
             self.is_playing = False
             self.voice_client.pause()
 
-    async def play_next(self, user: discord.User):
+    async def play_next(self, user: discord.User, force: bool = False):
         """Plays the next song asynchronously"""
 
-        if not self.is_playing:
+        if not self.is_playing and not force:
             return
 
         if self.exists_next_song_in_queue():
@@ -466,7 +454,8 @@ class Music(commands.Cog):
             return 0
 
         # Build first song (no pre-resolved source to avoid URL expiry)
-        vid0 = yt0.split("v=")[-1].split("&")[0] if "v=" in yt0 else yt0.rsplit("/", 1)[-1]
+        vid0 = yt0.split(
+            "v=")[-1].split("&")[0] if "v=" in yt0 else yt0.rsplit("/", 1)[-1]
         first_song = {
             "link": yt0,
             "thumbnail": _yt_thumb(vid0),
@@ -491,7 +480,8 @@ class Music(commands.Cog):
                                    for it in entries if it and it.get("track")]
                         batch_songs = await self._resolve_queries_to_songs(queries, shuffle_music)
                         for s in batch_songs:
-                            self.queue.append({"song": s, "channel": user_channel})
+                            self.queue.append(
+                                {"song": s, "channel": user_channel})
                         added += len(batch_songs)
                         offset += page_size
                 else:
@@ -501,17 +491,20 @@ class Music(commands.Cog):
                     while offset < total:
                         page = await self._sp_fetch_album_page(aid, offset=offset, limit=page_size)
                         entries = page.get("items") or []
-                        queries = [f'{it["name"]} {it["artists"][0]["name"]}' for it in entries if it]
+                        queries = [
+                            f'{it["name"]} {it["artists"][0]["name"]}' for it in entries if it]
                         batch_songs = await self._resolve_queries_to_songs(queries, shuffle_music)
                         for s in batch_songs:
-                            self.queue.append({"song": s, "channel": user_channel})
+                            self.queue.append(
+                                {"song": s, "channel": user_channel})
                         added += len(batch_songs)
                         offset += page_size
 
                 if added:
                     await channel_to_notify.send(f"📜 Added +{added} more from Spotify.")
             except Exception as ex:
-                self.logger.exception("Background Spotify mapping failed: %s", ex)
+                self.logger.exception(
+                    "Background Spotify mapping failed: %s", ex)
 
         self.client.loop.create_task(fetch_rest_spotify())
         return 1
@@ -527,7 +520,8 @@ class Music(commands.Cog):
                     yt_url = await self._yt_url_from_query(q)
                     if not yt_url:
                         return None
-                    vid = yt_url.split("v=")[-1].split("&")[0] if "v=" in yt_url else yt_url.rsplit("/", 1)[-1]
+                    vid = yt_url.split(
+                        "v=")[-1].split("&")[0] if "v=" in yt_url else yt_url.rsplit("/", 1)[-1]
                     return {
                         "link": yt_url,
                         "thumbnail": _yt_thumb(vid),
@@ -572,26 +566,37 @@ class Music(commands.Cog):
         if info.get("url"):
             return info["url"]
         # fall back to any audio-only format
-        audio_only = [f for f in fmts if f.get("vcodec") == "none" and f.get("acodec") not in (None, "none")]
+        audio_only = [f for f in fmts if f.get(
+            "vcodec") == "none" and f.get("acodec") not in (None, "none")]
         if audio_only:
-            best = max(audio_only, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0))
+            best = max(audio_only, key=lambda f: (
+                f.get("abr") or 0, f.get("tbr") or 0))
             return best.get("url")
         return None
 
     def play_audio(self, user, song):
         def play_next_callback(e):
-            asyncio.run_coroutine_threadsafe(self.play_next(user), self.client.loop)
+            asyncio.run_coroutine_threadsafe(
+                self.play_next(user), self.client.loop)
 
         async def play_audio_thread():
             source_url = song['source']
             if source_url is None:
                 source_url = await self.resolve_stream(song['original_url'])
                 if not source_url:
-                    self.logger.warning("Could not resolve stream for %s", song['original_url'])
+                    self.logger.warning(
+                        "Could not resolve stream for %s", song['original_url'])
+                    self.is_playing = False
+                    await self.play_next(user, force=True)  # skip broken track
                     return
-            self.voice_client.play(discord.PCMVolumeTransformer(
-                discord.FFmpegPCMAudio(source_url, **ffmpeg_options), volume=0.5
-            ), after=play_next_callback)
+            try:
+                self.voice_client.play(discord.PCMVolumeTransformer(
+                    discord.FFmpegPCMAudio(source_url, **ffmpeg_options), volume=0.5
+                ), after=play_next_callback)
+            except Exception as exc:
+                self.logger.exception("Failed to start playback: %s", exc)
+                self.is_playing = False
+                await self.play_next(user, force=True)
 
         self.client.loop.create_task(play_audio_thread())
 
@@ -698,7 +703,8 @@ class Music(commands.Cog):
             "link": link,
             "thumbnail": _pick_thumbnail(first) or _yt_thumb(vid or ""),
             "original_url": link,
-            "source": None,  # resolve right before playback (your play_audio already does this)
+            # resolve right before playback (your play_audio already does this)
+            "source": None,
             "title": first.get("title"),
         }
         self.queue.append({"song": first_song, "channel": user_channel})
@@ -737,7 +743,8 @@ class Music(commands.Cog):
                     await channel_to_notify.send(
                         f"📜 Added +{len(items)} more from the playlist (total now {len(items) + 1}).")
             except Exception as ex:
-                self.logger.exception("Background playlist fetch failed: %s", ex)
+                self.logger.exception(
+                    "Background playlist fetch failed: %s", ex)
 
         self.client.loop.create_task(fetch_rest())
         return added_count
@@ -756,49 +763,13 @@ class Music(commands.Cog):
         e = (info.get("entries") or [None])[0] if info else None
         return [e.get("webpage_url")] if e else []
 
-    # async def search_youtube(self, search: str):
-    #     """Searches YouTube for results based on url or search params
-    #
-    #     Args:
-    #         search (str): Url/ Search Params
-    #
-    #     Returns:
-    #         _type_: YouTube results
-    #     """
-    #     loop = asyncio.get_event_loop()
-    #
-    #     # If it's a valid Youtube URL, return it
-    #     if "youtube.com/watch?v=" in search or "youtu.be/" in search:
-    #         return [search]
-    #
-    #     # If it's a playlist, return directly
-    #     if "youtube.com/playlist?list=" in search:
-    #         return [search]
-    #
-    #     # Otherwise, search for the song
-    #     query_string = parse.urlencode({'search_query': search})
-    #     content = await loop.run_in_executor(self.executor,
-    #                                          request.urlopen, f'https://www.youtube.com/results?{query_string}')
-    #     content = content.read().decode()
-    #
-    #     # Detect video and playlist results
-    #     video_results = re.findall(r'/watch\?v=(.{11})', content)
-    #     playlist_results = re.findall(r'/playlist\?list=([a-zA-Z0-9_-]+)', content)
-    #
-    #     results = []
-    #     if video_results:
-    #         results.append(f"https://www.youtube.com/watch?v={video_results[0]}")
-    #     if playlist_results:
-    #         results.append(f"https://www.youtube.com/playlist?list={playlist_results[0]}")
-    #
-    #     return results[:1]
-
     async def extract_youtube(self, url: str):
         loop = asyncio.get_event_loop()
 
         def run_fast_or_single():
             # Treat pure playlist URLs as playlists; watch URLs stay single
-            is_playlist = ("playlist?list=" in url) or ("list=" in url and "watch?v=" not in url)
+            is_playlist = ("playlist?list=" in url) or (
+                "list=" in url and "watch?v=" not in url)
             opts = FAST_PLAYLIST_OPTS if is_playlist else SINGLE_OPTS
             from yt_dlp import YoutubeDL
             with YoutubeDL(opts) as yt:
@@ -916,7 +887,8 @@ class Music(commands.Cog):
                 await delete_message(msg)
                 return
             url0 = yt_urls[0]
-            vid0 = url0.split("v=")[-1].split("&")[0] if "v=" in url0 else url0.rsplit("/", 1)[-1]
+            vid0 = url0.split(
+                "v=")[-1].split("&")[0] if "v=" in url0 else url0.rsplit("/", 1)[-1]
             song_info = [{
                 "link": url0,
                 "thumbnail": _yt_thumb(vid0),
@@ -968,7 +940,8 @@ class Music(commands.Cog):
         # ---- Start playback if idle
         if not self.is_playing:
             if self.voice_client and self.voice_client.is_paused():
-                embed = create_playing_embed("📜 Added to queue 📜", itr.user, song_info)
+                embed = create_playing_embed(
+                    "📜 Added to queue 📜", itr.user, song_info)
                 msg2 = await itr.followup.send(embed=embed, silent=True)
                 await delete_message(msg2)
             else:
@@ -978,7 +951,8 @@ class Music(commands.Cog):
                 if not played:
                     await itr.followup.send('❌ There are no songs to be played in the queue ❌')
         else:
-            embed = create_playing_embed("📜 Added to queue 📜", itr.user, song_info)
+            embed = create_playing_embed(
+                "📜 Added to queue 📜", itr.user, song_info)
             msg2 = await itr.followup.send(embed=embed, silent=True)
             await delete_message(msg2)
 
@@ -990,6 +964,11 @@ class Music(commands.Cog):
             itr (discord.Interaction): Discord interaction
         """
         await itr.response.defer()
+
+        if self.is_queue_empty():
+            await itr.followup.send('ℹ️ There are no songs in the queue ℹ️', silent=True)
+            return
+
         embed = discord.Embed(title="🎚️ Music queue 🎚️")
 
         previous = self.get_previous_song()
@@ -1014,9 +993,11 @@ class Music(commands.Cog):
             ]
             songs_text = "\n".join(song_list)
             if len(songs_text) > 1024:
-                songs_text = songs_text[:1021] + "..."  # Ensure it doesn't exceed 1024
+                # Ensure it doesn't exceed 1024
+                songs_text = songs_text[:1021] + "..."
 
-            embed.add_field(name="PLAYING NEXT", value=songs_text, inline=False)
+            embed.add_field(name="PLAYING NEXT",
+                            value=songs_text, inline=False)
         except Exception as e:
             pass
         await itr.followup.send(embed=embed, silent=True)
