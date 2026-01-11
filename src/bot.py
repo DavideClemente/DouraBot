@@ -22,6 +22,7 @@ class Client(commands.Bot):
 
     async def on_ready(self):
         self.logger.info(f'User: {self.user} (ID: {self.user.id})')
+        self.tree.clear_commands(guild=settings.DISCORD_GUILD)
         self.tree.copy_global_to(guild=settings.DISCORD_GUILD)
         synced = await self.tree.sync(guild=settings.DISCORD_GUILD)
         self.logger.info(
