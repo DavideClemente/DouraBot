@@ -1,9 +1,12 @@
+from dis import disco
 import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
+from py_linq.py_linq import Enumerable
 import pycountry
 import settings
+
 
 
 def bold_msg(msg: str) -> str:
@@ -14,21 +17,18 @@ def bold_msg(msg: str) -> str:
 
 
 def is_role_allowed(*roles):
-    def predicate(inter: discord.Interaction):
-        return any(role in [r.id for r in inter.user.roles] for role in roles)
+    def predicate(inter: discord.Interaction) -> bool:
+        user_role_ids = Enumerable(inter.user.roles).select(lambda r: r.id).to_list()
+        return Enumerable(roles).any(lambda role: role in user_role_ids)
 
     return app_commands.check(predicate)
 
 
-def rating_to_stars(rating: float):
+def rating_to_stars(rating: float) -> str:
     full_stars = int(rating / 2)
     half_star = int((rating % 2) != 0)
 
     return "⭐" * full_stars + ("½" if half_star else "")
-
-
-def if_none_then_empty_string(value):
-    return value if value is not None else ""
 
 
 def convert_to_datetime(date_str: str) -> datetime:
@@ -60,8 +60,10 @@ def hex_to_rgba(hex_color: str):
     return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
 
 
-def create_dourabot_embed(title: str, description: str = "", color: str = settings.DOURADINHOS_COLOR,
-                          thumbnail_url: str = settings.DOURADINHOS_IMAGE):
+def create_dourabot_embed(title: str, 
+                          description: str = "", 
+                          color: str = settings.DOURADINHOS_COLOR,
+                          thumbnail_url: str = settings.DOURADINHOS_IMAGE) -> discord.Embed:
     embed = discord.Embed(title=title, description=description, color=discord.Color.from_str(color))
     embed.set_author(name="DouraBot", icon_url=settings.DOURADINHOS_AVATAR)
     embed.set_thumbnail(url=thumbnail_url)

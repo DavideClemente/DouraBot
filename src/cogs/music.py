@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError, ExtractorError
 
 from random import shuffle
 import settings
@@ -332,6 +333,39 @@ class Music(commands.Cog):
         if msg:
             await delete_message(msg)
 
+    async def reaction_shuffle(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
+        msg = None
+        if self.is_queue_empty():
+            msg = await channel.send("❌ The queue is empty ❌")
+        else:
+            self.shuffle_enabled = not self.shuffle_enabled
+
+            if self.shuffle_enabled:
+                # Save original queue order before shuffling
+                self._original_queue = self._queue.copy()
+                # Shuffle the remaining songs (everything after current)
+                if self.exists_next_song_in_queue():
+                    upcoming = self._queue[self.queue_index + 1:]
+                    shuffle(upcoming)
+                    self._queue[self.queue_index + 1:] = upcoming
+                    msg = await channel.send(f'🔀 Shuffle enabled by {user.display_name}')
+                else:
+                    msg = await channel.send(f'🔀 Shuffle enabled (no songs to shuffle) by {user.display_name}')
+            else:
+                # Restore original queue order
+                if self._original_queue:
+                    # Restore from saved position onwards
+                    self._queue[self.queue_index +
+                                1:] = self._original_queue[self.queue_index + 1:]
+                    self._original_queue = None
+                msg = await channel.send(f'➡️ Shuffle disabled by {user.display_name}')
+
+            await reaction.message.clear_reactions()
+            await add_reactions(reaction.message)
+
+        if msg:
+            await delete_message(msg)
+
     async def join_voice_channel(self, text_channel, voice_channel):
         """Join a voice channel
 
@@ -550,8 +584,7 @@ class Music(commands.Cog):
             results = await asyncio.gather(*(process(q) for q in chunk))
             items = [r for r in results if r]
             if shuffle_music:
-                from random import shuffle as _shuffle
-                _shuffle(items)
+                shuffle(items)
             out.extend(items)
         return out
 
@@ -565,6 +598,13 @@ class Music(commands.Cog):
 
         try:
             info = await loop.run_in_executor(self.executor, run)
+        except (DownloadError, ExtractorError) as e:
+            error_msg = str(e)
+            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+                self.logger.warning(f"YouTube bot verification required for {watch_url}")
+            else:
+                self.logger.warning(f"resolve_stream failed: {e}")
+            return None
         except Exception as e:
             self.logger.warning(f"resolve_stream failed: {e}")
             return None
@@ -712,6 +752,13 @@ class Music(commands.Cog):
 
         try:
             return await loop.run_in_executor(self.executor, run)
+        except (DownloadError, ExtractorError) as e:
+            error_msg = str(e)
+            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+                self.logger.error(f"_ydl_flat: YouTube bot verification required for {url}")
+            else:
+                self.logger.error(f"_ydl_flat error: {e}")
+            return None
         except Exception as e:
             self.logger.error(f"_ydl_flat error: {e}")
             return None
@@ -792,7 +839,18 @@ class Music(commands.Cog):
             with YoutubeDL({"quiet": True, "noplaylist": True}) as yt:
                 return yt.extract_info(f"ytsearch1:{q}", download=False)
 
-        info = await loop.run_in_executor(self.executor, run)
+        try:
+            info = await loop.run_in_executor(self.executor, run)
+        except (DownloadError, ExtractorError) as e:
+            error_msg = str(e)
+            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+                self.logger.error(f"search_youtube: YouTube bot verification required for query '{q}'")
+            else:
+                self.logger.error(f"search_youtube error: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"search_youtube error: {e}")
+            return []
         e = (info.get("entries") or [None])[0] if info else None
         return [e.get("webpage_url")] if e else []
 
@@ -810,6 +868,13 @@ class Music(commands.Cog):
 
         try:
             info = await loop.run_in_executor(self.executor, run_fast_or_single)
+        except (DownloadError, ExtractorError) as e:
+            error_msg = str(e)
+            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+                self.logger.error(f"extract_youtube: YouTube bot verification required for {url}")
+            else:
+                self.logger.error(f"Error extracting YouTube info: {e}")
+            return None
         except Exception as e:
             self.logger.error(f"Error extracting YouTube info: {e}")
             return None
@@ -874,120 +939,128 @@ class Music(commands.Cog):
         channel = itr.channel
         self.logger.info(f'User {itr.user.display_name} called play/{search}')
 
-        # must check BEFORE using itr.user.voice.channel
-        if not itr.user.voice:
-            await itr.followup.send('⚠️ You need to be connected to a voice channel ⚠️')
-            return
-        user_channel = itr.user.voice.channel
-
-        # No search: (re)play from queue or resume
-        if search is None:
-            if self.is_queue_empty():
-                await itr.followup.send('❌ There are no songs to be played in the queue ❌')
+        try:
+            # must check BEFORE using itr.user.voice.channel
+            if not itr.user.voice:
+                await itr.followup.send('⚠️ You need to be connected to a voice channel ⚠️')
                 return
-            if not self.is_playing:
-                played = await self.play_music(itr.channel.id, itr.user)
-                if not played:
+            user_channel = itr.user.voice.channel
+
+            # No search: (re)play from queue or resume
+            if search is None:
+                if self.is_queue_empty():
                     await itr.followup.send('❌ There are no songs to be played in the queue ❌')
-            else:
-                self.is_playing = True
-                self.voice_client.resume()
-            return
-
-        # We have a search / URL
-        song_info: list[dict] = []
-        already_enqueued_first = False
-
-        # ---- Spotify (playlist/album progressive)
-        if is_spotify_playlist(search) or is_spotify_album(search):
-            self.logger.info(f'Spotify URL found: {search}')
-            added_now = await self.enqueue_spotify_playlist_progressive(
-                search, user_channel, channel, shuffle_music
-            )
-            if added_now == 0:
-                await itr.followup.send('❌ Could not read this Spotify URL ❌')
-                return
-            # First track was already enqueued by the progressive method
-            song_info = [self._queue[-1]['song']]
-            already_enqueued_first = True
-
-        # ---- Spotify single track (map to YouTube)
-        elif is_spotify_url(search):
-            query = get_spotify_track_info(search)  # "Title Artist"
-            yt_urls = await self.search_youtube(query)
-            if not yt_urls:
-                msg = await itr.followup.send('❌ Could not find the song ❌')
-                await delete_message(msg)
-                return
-            url0 = yt_urls[0]
-            vid0 = url0.split(
-                "v=")[-1].split("&")[0] if "v=" in url0 else url0.rsplit("/", 1)[-1]
-            song_info = [{
-                "link": url0,
-                "thumbnail": _yt_thumb(vid0),
-                "original_url": url0,
-                "source": None,  # resolve just-in-time at play
-                "title": query,
-            }]
-
-        else:
-            # ---- YouTube: search or URL
-            search_results = await self.search_youtube(search)
-            self.logger.info(f'Youtube Search results: {search_results}')
-            if not search_results:
-                msg = await itr.followup.send('❌ Could not find the song ❌')
-                await delete_message(msg)
+                    return
+                if not self.is_playing:
+                    played = await self.play_music(itr.channel.id, itr.user)
+                    if not played:
+                        await itr.followup.send('❌ There are no songs to be played in the queue ❌')
+                else:
+                    self.is_playing = True
+                    self.voice_client.resume()
                 return
 
-            yt_url = search_results[0]
+            # We have a search / URL
+            song_info: list[dict] = []
+            already_enqueued_first = False
 
-            # YouTube playlist → progressive
-            if _is_playlist_url(yt_url):
-                added_now = await self.enqueue_playlist_progressive(
-                    yt_url, user_channel, channel, shuffle_music
+            # ---- Spotify (playlist/album progressive)
+            if is_spotify_playlist(search) or is_spotify_album(search):
+                self.logger.info(f'Spotify URL found: {search}')
+                added_now = await self.enqueue_spotify_playlist_progressive(
+                    search, user_channel, channel, shuffle_music
                 )
                 if added_now == 0:
-                    await itr.followup.send('❌ Could not read this playlist ❌')
+                    await itr.followup.send('❌ Could not read this Spotify URL ❌')
                     return
+                # First track was already enqueued by the progressive method
                 song_info = [self._queue[-1]['song']]
                 already_enqueued_first = True
 
-            # Single YouTube video → extract now
+            # ---- Spotify single track (map to YouTube)
+            elif is_spotify_url(search):
+                query = get_spotify_track_info(search)  # "Title Artist"
+                yt_urls = await self.search_youtube(query)
+                if not yt_urls:
+                    msg = await itr.followup.send('❌ Could not find the song ❌')
+                    await delete_message(msg)
+                    return
+                url0 = yt_urls[0]
+                vid0 = url0.split(
+                    "v=")[-1].split("&")[0] if "v=" in url0 else url0.rsplit("/", 1)[-1]
+                song_info = [{
+                    "link": url0,
+                    "thumbnail": _yt_thumb(vid0),
+                    "original_url": url0,
+                    "source": None,  # resolve just-in-time at play
+                    "title": query,
+                }]
+
             else:
-                song_info = await self.extract_youtube(yt_url)
-                if not song_info:
-                    await itr.followup.send('❌ Could not play the song ❌')
+                # ---- YouTube: search or URL
+                search_results = await self.search_youtube(search)
+                self.logger.info(f'Youtube Search results: {search_results}')
+                if not search_results:
+                    msg = await itr.followup.send('❌ Could not find the song ❌')
+                    await delete_message(msg)
                     return
 
-        # ---- Add to queue (avoid double-add for progressive branches)
-        if shuffle_music:
-            from random import shuffle as _shuffle
-            _shuffle(song_info)
+                yt_url = search_results[0]
 
-        if not already_enqueued_first:
-            for s in song_info:
-                self._queue.append({'song': s, 'channel': user_channel})
+                # YouTube playlist → progressive
+                if _is_playlist_url(yt_url):
+                    added_now = await self.enqueue_playlist_progressive(
+                        yt_url, user_channel, channel, shuffle_music
+                    )
+                    if added_now == 0:
+                        await itr.followup.send('❌ Could not read this playlist ❌')
+                        return
+                    song_info = [self._queue[-1]['song']]
+                    already_enqueued_first = True
 
-        await channel.send(f'📜 Added {len(song_info)} song{"s" if len(song_info) != 1 else ""} to the queue 📜')
+                # Single YouTube video → extract now
+                else:
+                    song_info = await self.extract_youtube(yt_url)
+                    if not song_info:
+                        await itr.followup.send('❌ Could not play the song ❌')
+                        return
 
-        # ---- Start playback if idle
-        if not self.is_playing:
-            if self.voice_client and self.voice_client.is_paused():
+            # ---- Add to queue (avoid double-add for progressive branches)
+            if shuffle_music:
+                from random import shuffle as _shuffle
+                _shuffle(song_info)
+
+            if not already_enqueued_first:
+                for s in song_info:
+                    self._queue.append({'song': s, 'channel': user_channel})
+
+            await channel.send(f'📜 Added {len(song_info)} song{"s" if len(song_info) != 1 else ""} to the queue 📜')
+
+            # ---- Start playback if idle
+            if not self.is_playing:
+                if self.voice_client and self.voice_client.is_paused():
+                    embed = create_playing_embed(
+                        "📜 Added to queue 📜", itr.user, song_info)
+                    msg2 = await itr.followup.send(embed=embed, silent=True)
+                    await delete_message(msg2)
+                else:
+                    tmp_msg = await itr.followup.send("▶️ Connected and playing...")
+                    await delete_message(tmp_msg)
+                    played = await self.play_music(itr.channel.id, itr.user)
+                    if not played:
+                        await itr.followup.send('❌ There are no songs to be played in the queue ❌')
+            else:
                 embed = create_playing_embed(
                     "📜 Added to queue 📜", itr.user, song_info)
                 msg2 = await itr.followup.send(embed=embed, silent=True)
                 await delete_message(msg2)
-            else:
-                tmp_msg = await itr.followup.send("▶️ Connected and playing...")
-                await delete_message(tmp_msg)
-                played = await self.play_music(itr.channel.id, itr.user)
-                if not played:
-                    await itr.followup.send('❌ There are no songs to be played in the queue ❌')
-        else:
-            embed = create_playing_embed(
-                "📜 Added to queue 📜", itr.user, song_info)
-            msg2 = await itr.followup.send(embed=embed, silent=True)
-            await delete_message(msg2)
+
+        except Exception as e:
+            self.logger.exception(f"Error in play command: {e}")
+            try:
+                await itr.followup.send('❌ An error occurred while processing your request. Please try again later. ❌', ephemeral=True)
+            except Exception:
+                self.logger.error("Could not send error message to user")
 
     def _queue_embed(self, page: int, page_size: int) -> discord.Embed:
         """Build a paginated queue embed with current/previous headers."""
@@ -1146,38 +1219,57 @@ class Music(commands.Cog):
         msg = await itr.followup.send(f'⏭️ Skipped to song #{index}')
         await delete_message(msg)
 
-    async def reaction_shuffle(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
-        msg = None
+    @app_commands.command(name='move_song', description="move a song to a different position in the queue")
+    async def move_song(self, itr: discord.Interaction, from_index: int, to_index: int):
+        """Move a song from one position to another in the queue
+
+        Args:
+            itr (discord.Interaction): Discord interaction
+            from_index (int): The current position of the song (0-based, as shown in queue)
+            to_index (int): The desired position for the song (0-based, as shown in queue)
+        """
+        await itr.response.defer()
+
+        if not self.voice_client:
+            await itr.followup.send("❌ Not connected to a voice channel ❌")
+            return
+
         if self.is_queue_empty():
-            msg = await channel.send("❌ The queue is empty ❌")
-        else:
-            self.shuffle_enabled = not self.shuffle_enabled
+            await itr.followup.send("❌ The queue is empty ❌")
+            return
 
-            if self.shuffle_enabled:
-                # Save original queue order before shuffling
-                self._original_queue = self._queue.copy()
-                # Shuffle the remaining songs (everything after current)
-                if self.exists_next_song_in_queue():
-                    upcoming = self._queue[self.queue_index + 1:]
-                    shuffle(upcoming)
-                    self._queue[self.queue_index + 1:] = upcoming
-                    msg = await channel.send(f'🔀 Shuffle enabled by {user.display_name}')
-                else:
-                    msg = await channel.send(f'🔀 Shuffle enabled (no songs to shuffle) by {user.display_name}')
-            else:
-                # Restore original queue order
-                if self._original_queue:
-                    # Restore from saved position onwards
-                    self._queue[self.queue_index +
-                                1:] = self._original_queue[self.queue_index + 1:]
-                    self._original_queue = None
-                msg = await channel.send(f'➡️ Shuffle disabled by {user.display_name}')
+        # Validate indices (0-based as shown in the queue)
+        if from_index < 0 or from_index >= len(self._queue):
+            await itr.followup.send(f"❌ Invalid source index. Must be between 0 and {len(self._queue) - 1} ❌")
+            return
 
-            await reaction.message.clear_reactions()
-            await add_reactions(reaction.message)
+        if to_index < 0 or to_index >= len(self._queue):
+            await itr.followup.send(f"❌ Invalid destination index. Must be between 0 and {len(self._queue) - 1} ❌")
+            return
 
-        if msg:
-            await delete_message(msg)
+        if from_index == to_index:
+            await itr.followup.send("ℹ️ Source and destination indices are the same ℹ️")
+            return
+
+        # Cannot move the currently playing song
+        if from_index == self.queue_index:
+            await itr.followup.send("❌ Cannot move the currently playing song ❌")
+            return
+
+        # Move the song
+        song = self._queue.pop(from_index)
+        self._queue.insert(to_index, song)
+
+        # Adjust queue_index if necessary
+        if from_index < self.queue_index < to_index:
+            self.queue_index -= 1
+        elif to_index <= self.queue_index < from_index:
+            self.queue_index += 1
+
+        song_title = song['song'][0]['title'] if isinstance(
+            song['song'], list) else song['song']['title']
+        msg = await itr.followup.send(f'🔄 Moved "{song_title}" from position {from_index} to {to_index}')
+        await delete_message(msg)
 
 
 async def setup(client: commands.Bot) -> None:
