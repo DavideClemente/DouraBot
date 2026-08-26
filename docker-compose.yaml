@@ -19,10 +19,17 @@ services:
         volumes:
             - ./mariadb:/var/lib/mysql
         restart: always
+        healthcheck:
+            test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
 
     dourabot:
         depends_on:
-            - mariadoura
+            mariadoura:
+                condition: service_healthy
         image: davide2707clemente/dourabot:latest
         container_name: dourabot
         networks:
