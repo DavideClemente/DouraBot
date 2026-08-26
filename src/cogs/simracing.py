@@ -1,9 +1,9 @@
 from math import ceil
 
 import discord
-import requests
 from discord import app_commands
 from discord.ext import commands, tasks
+from logic.http import fetch_json
 from logic.messages import get_latest_message_id_by_channel_id, delete_message_by_id, insert_message
 from cogs.configs import get_config_value
 
@@ -37,9 +37,7 @@ class SimRacing(commands.Cog):
         channel_id: str = get_config_value('ACC_SERVER_STATUS')
 
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
+            data = await fetch_json(url)
             status = data.get("status")
             color = discord.Color.green() if status == 1 else discord.Color.red()
 

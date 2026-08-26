@@ -5,7 +5,7 @@ from database import DatabaseManager
 from discord.ext import commands
 from discord import app_commands
 from settings import get_logger, CARD_API
-import requests
+from logic.http import fetch_json
 
 
 RANDOM_CARD_URL = CARD_API + '/deck/new/draw/?count=1'
@@ -27,8 +27,7 @@ class GameDropDown(discord.ui.Select):
         if self.values[0] == "So...":
             await itr.followup.send(file=await self.draw_card(self.values[0]))
         elif self.values[0] == "Default Card":
-            response = requests.get(RANDOM_CARD_URL)
-            json_response = response.json()
+            json_response = await fetch_json(RANDOM_CARD_URL)
 
             if json_response['success']:
                 embed = discord.Embed()

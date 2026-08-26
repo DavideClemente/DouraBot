@@ -1,8 +1,8 @@
 from io import BytesIO
 import re
 from PIL import Image, ImageDraw, ImageFont
-import requests
 import settings
+from logic.http import fetch_bytes
 from logic.utilities import hex_to_rgba
 from database import DatabaseManager
 
@@ -14,9 +14,9 @@ def create_circle(size):
     return mask
 
 
-def get_image(url: str):
-    response = requests.get(url)
-    return Image.open(BytesIO(response.content)).convert('RGBA')
+async def get_image(url: str):
+    content = await fetch_bytes(url)
+    return Image.open(BytesIO(content)).convert('RGBA')
 
 
 def get_image_db(db, id: str):
