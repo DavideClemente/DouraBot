@@ -1,10 +1,10 @@
 import discord
-import requests
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, Select, View
 
 import settings
+from logic.http import fetch_json
 from logic.utilities import is_role_allowed
 from settings import ROLES
 
@@ -51,8 +51,8 @@ class MySelectView(View):
         if self.fromCurrency is None or self.toCurrency is None:
             return await interaction.response.send_message("Please select both currencies", ephemeral=True)
 
-        api_response_json = requests.get(
-            f'{settings.CURRENCY_API}&currencies={self.toCurrency}&base_currency={self.fromCurrency}').json()
+        api_response_json = await fetch_json(
+            f'{settings.CURRENCY_API}&currencies={self.toCurrency}&base_currency={self.fromCurrency}')
 
         if (api_response_json['data'] is not None):
             data = api_response_json['data']

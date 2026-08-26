@@ -6,9 +6,9 @@ from discord.ext import commands
 from faceit import Faceit
 from faceit.constants import GameID
 from faceit.exceptions import APIError
-import requests
 
 import settings
+from logic.http import fetch_json
 from logic.utilities import create_dourabot_embed, country_code_to_flag, get_country_name, bold_msg
 
 FACEIT_MAP_NAMES = {
@@ -51,7 +51,7 @@ class FaceitCog(commands.Cog):
 
     group = app_commands.Group(name="faceit", description="Faceit commands")
 
-    def get_match_stats(self, match_id: str) -> dict:
+    async def get_match_stats(self, match_id: str) -> dict:
         """
         Fetch match statistics for a given match ID.
 
@@ -67,9 +67,8 @@ class FaceitCog(commands.Cog):
                 "Authorization": f"Bearer {settings.FACEIT_API_KEY}",
                 "Accept": "application/json"
             }
-            response = requests.get(url, headers=headers).json()
-            return response
-        except APIError as e:
+            return await fetch_json(url, headers=headers)
+        except Exception as e:
             self.logger.error(f"Faceit API Error: {e}")
             return {}
 
@@ -195,7 +194,7 @@ class FaceitCog(commands.Cog):
                 result = "✅ Win" if won else "❌ Loss"
                 faceit_url = match.faceit_url.__str__()
 
-                match_stats = self.get_match_stats(match.id)
+                match_stats = await self.get_match_stats(match.id)
                 match_map = self.get_match_map(match_stats)
                 score = self.get_match_result(match_stats, won)
                 kd = self.get_match_kd(match_stats, team_id.id, player.id)

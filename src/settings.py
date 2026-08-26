@@ -9,17 +9,13 @@ load_dotenv()
 # ENVIRONMENT
 ENVIRONMENT = os.getenv("ENVIRONMENT", "PROD")
 IS_DEV = True if ENVIRONMENT == 'DEV' else False
-if IS_DEV:
-    DB_HOST = 'localhost'
-    DB_USER = 'dourabot'
-    DB_PASSWORD = 'dourabot123'
-    DB_DATABASE = 'master'
-else:
-    DB_HOST = 'mariadoura'
-    DB_USER = 'root'
-    DB_PASSWORD = 'davide123'
-    DB_DATABASE = 'master'
-DB_PORT = 3306
+# DB config is injected at runtime (docker-compose env_file / local .env).
+# Defaults match the local dev stack so `python src/bot.py` works out of the box.
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_USER = os.getenv("DB_USER", "dourabot")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "dourabot123")
+DB_DATABASE = os.getenv("DB_DATABASE", "master")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
 
 # CONSTANTS
 DISCORD_TOKEN = os.getenv(
@@ -30,6 +26,7 @@ SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 FACEIT_API_KEY = os.getenv("FACEIT_API_KEY")
 AIRPORTS_KEY = os.getenv("AIRPORTS_DB_KEY")
+UPTIME_KUMA_URL = os.getenv("UPTIME_KUMA_URL")
 
 DOURADINHOS_COLOR = '0x#f28e0e'
 DOURADINHOS_IMAGE = 'https://www.nit.pt/wp-content/uploads/2016/10/ed3647fa-e8e1-47da-984f-4f166d66fa1c-754x394.jpg'

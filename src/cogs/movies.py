@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands, ChannelType
 from settings import IMDB_API
 from logic.utilities import rating_to_stars
-import requests
+from logic.http import fetch_json
 
 logger = settings.get_logger()
 
@@ -28,8 +28,7 @@ class Movies(commands.Cog):
             return
 
         movie_id = imdb_data["id"]
-        details = requests.get(
-            f'{IMDB_API}/title/{movie_id}').json()
+        details = await fetch_json(f'{IMDB_API}/title/{movie_id}')
 
         description = f'''
             Directors - {", ".join(details.get("directors", []))}
@@ -62,14 +61,12 @@ class Movies(commands.Cog):
             f'User {itr.user.display_name} called search_imdb/{title}')
         await itr.response.defer()
 
-        resp = requests.get(
-            f'{IMDB_API}/search?query={title.strip().capitalize()}')
-
-        if resp.status_code != 200:
+        try:
+            json_res = await fetch_json(
+                f'{IMDB_API}/search?query={title.strip().capitalize()}')
+        except Exception:
             await itr.followup.send('Something went wrong!')
             return
-
-        json_res = resp.json()
 
         await itr.followup.send("Sending results to a thread...")
         channel = self.client.get_channel(itr.channel_id)

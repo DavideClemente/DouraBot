@@ -62,7 +62,7 @@ class Client(commands.Bot):
                 insert_user(conn,
                             member.id, member.display_name, user_number)
                 avatar = member.avatar.url
-                avatar_img = get_image(avatar)
+                avatar_img = await get_image(avatar)
                 avatar_img = avatar_img.resize((150, 150))
                 bck_image = get_image_db(
                     conn, 'background_welcome')
