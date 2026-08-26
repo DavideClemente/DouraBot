@@ -47,6 +47,9 @@ services:
             - DOCKER_API_VERSION=1.44
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock
+            # Reuse the host's registry login so watchtower can pull the
+            # private davide2707clemente/dourabot image.
+            - ${HOME}/.docker/config.json:/config.json:ro
         command: --interval 300 --cleanup dourabot
 
 volumes:
