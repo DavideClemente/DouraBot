@@ -69,13 +69,5 @@ jobs:
         push: true
         tags: |
           davide2707clemente/dourabot:latest
+          davide2707clemente/dourabot:${{ steps.bump.outputs.new_tag }}
         platforms: linux/amd64,linux/arm64
-        build-args: |
-          TOKEN_PROD=${{ vars.TOKEN_PROD }}
-          DOURADINHOS=${{ vars.DOURADINHOS }}
-          CURRENCY_API_KEY=${{ vars.CURRENCY_API_KEY }}
-          CLOUDFLARE_WORKER=${{ vars.CLOUDFLARE_WORKER }}
-          SPOTIFY_CLIENT_ID=${{ vars.SPOTIFY_CLIENT_ID }}
-          SPOTIFY_CLIENT_SECRET=${{ vars.SPOTIFY_CLIENT_SECRET }}
-          FACEIT_API_KEY=${{ secrets.FACEIT_API_KEY }}
-          AIRPORTS_DB_KEY=${{ secrets.AIRPORTS_DB_KEY }}

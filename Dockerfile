@@ -11,25 +11,9 @@ COPY ./assets ./assets
 COPY ./fonts ./fonts
 RUN mkdir ./logs
 
-# ENVIRONMENT VARIABLES
-
-ARG TOKEN_PROD
-ARG DOURADINHOS
-ARG CURRENCY_API_KEY
-ARG CLOUDFLARE_WORKER
-ARG SPOTIFY_CLIENT_ID
-ARG SPOTIFY_CLIENT_SECRET
-ARG FACEIT_API_KEY
-ARG AIRPORTS_DB_KEY
-
-ENV TOKEN_PROD=$TOKEN_PROD
-ENV DOURADINHOS=$DOURADINHOS
-ENV CURRENCY_API_KEY=$CURRENCY_API_KEY
-ENV CLOUDFLARE_WORKER=$CLOUDFLARE_WORKER
-ENV SPOTIFY_CLIENT_ID=$SPOTIFY_CLIENT_ID
-ENV SPOTIFY_CLIENT_SECRET=$SPOTIFY_CLIENT_SECRET
-ENV FACEIT_API_KEY=$FACEIT_API_KEY
-ENV AIRPORTS_DB_KEY=$AIRPORTS_DB_KEY
+# Config and secrets are injected at runtime via docker-compose `env_file`
+# (see .env / .env.example). The image is intentionally config-free so it can
+# be reused across environments and never bakes secrets into its layers.
 
 CMD [ "python", "./src/bot.py" ]
 
