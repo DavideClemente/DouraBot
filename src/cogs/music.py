@@ -1,1275 +1,270 @@
-import asyncio
-import re
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from urllib import parse, request
-
 import discord
 from discord import app_commands
 from discord.ext import commands
-from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError, ExtractorError
 
-from random import shuffle
 import settings
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
-import subprocess
-
-sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
-    client_id=settings.SPOTIFY_CLIENT_ID,
-    client_secret=settings.SPOTIFY_CLIENT_SECRET
-))
-
-ytdl_format_options = {
-    # 'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'noplaylist': False,
-    'no_warnings': True,
-    'default_search': 'auto',
-    # bind to ipv4 since ipv6 addresses cause issues sometimes
-    'source_address': '0.0.0.0'
-}
-
-FAST_PLAYLIST_OPTS = {
-    **ytdl_format_options,
-    "noplaylist": False,              # allow playlist container
-    "extract_flat": "in_playlist",    # <-- key speedup: don't resolve each entry
-    "skip_download": True,
-}
-
-SINGLE_OPTS = {
-    **ytdl_format_options,
-    "noplaylist": True,               # only a single video
-    "format": "bestaudio/best",
-}
+from logic import music_sources
+from logic.music_player import GuildPlayer, track_embed
+from logic.music_sources import SourceError
 
 
-ffmpeg_options = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn -b:a 256k'
-}
+async def _reply(itr: discord.Interaction, *args, delete_after: float | None = None, **kwargs):
+    """Interaction followup with `delete_after` support (webhooks don't have it)."""
+    msg = await itr.followup.send(*args, wait=True, **kwargs)
+    if delete_after:
+        await msg.delete(delay=delete_after)
+    return msg
 
 
-def _yt_watch_url(video_id: str) -> str:
-    return f"https://www.youtube.com/watch?v={video_id}"
 
+class QueueView(discord.ui.View):
+    def __init__(self, player: GuildPlayer, user: discord.abc.User, page_size: int = 10):
+        super().__init__(timeout=120)
+        self.player = player
+        self.user = user
+        self.page_size = page_size
+        self.page = 0
+        self.message: discord.Message | None = None
+        self._update_buttons()
 
-def _yt_thumb(video_id: str) -> str:
-    # safe default if yt-dlp entry lacks thumbnails
-    return f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+    @property
+    def total_pages(self) -> int:
+        return max(1, -(-len(self.player.upcoming) // self.page_size))
 
+    def _update_buttons(self):
+        self.page = max(0, min(self.page, self.total_pages - 1))
+        self.prev_page.disabled = self.page == 0
+        self.next_page.disabled = self.page >= self.total_pages - 1
 
-def _get_sp_playlist_id(url: str) -> str:
-    return url.split("/")[-1].split("?")[0]
+    def embed(self) -> discord.Embed:
+        player = self.player
+        embed = discord.Embed(title='🎚️ Music queue 🎚️',
+                              color=discord.Color.from_str(settings.DOURADINHOS_COLOR))
+        if player.index > 0:
+            prev = player.tracks[player.index - 1]
+            embed.add_field(name='PREVIOUS', value=f'[{prev.title}]({prev.link})'[:1024], inline=False)
+        if player.current:
+            cur = player.current
+            embed.add_field(name='CURRENT', value=f'[{cur.title}]({cur.link})'[:1024], inline=False)
 
+        start = self.page * self.page_size
+        first_index = player.index + 1 + start
+        lines = [f'{first_index + i}. [{t.title}]({t.link})'
+                 for i, t in enumerate(player.upcoming[start:start + self.page_size])]
+        text = '\n'.join(lines) or '(no more songs queued)'
+        if len(text) > 1024:
+            text = text[:1021] + '...'
+        embed.add_field(name=f'PLAYING NEXT (page {self.page + 1}/{self.total_pages})',
+                        value=text, inline=False)
+        embed.set_footer(text=f'{len(player.upcoming)} songs queued'
+                              f'{" · shuffle on" if player.shuffle_enabled else ""}')
+        return embed
 
-def _get_sp_album_id(url: str) -> str:
-    return url.split("/")[-1].split("?")[0]
+    async def _turn_page(self, itr: discord.Interaction, delta: int):
+        if itr.user.id != self.user.id:
+            await itr.response.send_message('ℹ️ Use /queue to get your own copy ℹ️', ephemeral=True)
+            return
+        self.page += delta
+        self._update_buttons()
+        await itr.response.edit_message(embed=self.embed(), view=self)
 
+    @discord.ui.button(label='Prev', style=discord.ButtonStyle.secondary)
+    async def prev_page(self, itr: discord.Interaction, button: discord.ui.Button):
+        await self._turn_page(itr, -1)
 
-def _pick_thumbnail(info: dict) -> str | None:
-    if info.get("thumbnail"):
-        return info["thumbnail"]
-    thumbs = info.get("thumbnails") or []
-    if thumbs:
-        best = max(thumbs, key=lambda t: (
-            t.get("width") or 0, t.get("height") or 0))
-        return best.get("url")
-    vid = info.get("id")
-    return _yt_thumb(vid) if vid else None
+    @discord.ui.button(label='Next', style=discord.ButtonStyle.secondary)
+    async def next_page(self, itr: discord.Interaction, button: discord.ui.Button):
+        await self._turn_page(itr, 1)
 
-
-def _pick_best_stream(info: dict) -> str | None:
-    fmts = info.get("formats") or []
-    if not fmts:
-        return None
-    # Prefer audio-only
-    audio_only = [f for f in fmts if f.get(
-        "vcodec") == "none" and f.get("acodec") not in (None, "none")]
-    # 1) Opus/WebM
-    opus = [f for f in audio_only if f.get(
-        "acodec") == "opus" or f.get("ext") == "webm"]
-    if opus:
-        return max(opus, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
-    # 2) M4A/MP4 (HLS audio like itag 233/234)
-    m4a = [f for f in audio_only if f.get("ext") in ("m4a", "mp4")]
-    if m4a:
-        return max(m4a, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
-    # 3) Any audio-only
-    if audio_only:
-        return max(audio_only, key=lambda f: (f.get("abr") or 0, f.get("tbr") or 0)).get("url")
-    # 4) Any A/V that includes audio
-    av = [f for f in fmts if f.get("acodec") not in (None, "none")]
-    if av:
-        return max(av, key=lambda f: (f.get("tbr") or 0, f.get("abr") or 0)).get("url")
-    return None
-
-
-def _is_playlist_url(url: str) -> bool:
-    # treat "pure" playlist links as playlists; 'watch?v=...' stays a single video
-    return ("youtube.com/playlist?list=" in url) or (
-        "list=" in url and "watch?v=" not in url
-    )
-
-
-def create_playing_embed(title, author: discord.User, song):
-    if not song:  # Check if the song list is empty
-        raise ValueError("The song list is empty. Cannot create an embed.")
-    if type(song) is list:
-        song = song[0]
-    embed = discord.Embed(title=title,
-                          description=f'[{song["title"]}]({song["link"]})',
-                          color=discord.Color.from_str(
-                              settings.DOURADINHOS_COLOR)
-                          )
-    embed.set_thumbnail(url=song["thumbnail"])
-    embed.set_footer(
-        text=f'Song added by: {str(author)}', icon_url=author.avatar.url)
-    return embed
-
-
-async def add_reactions(msg: discord.Message):
-    await asyncio.gather(
-        msg.add_reaction('⏮️'),
-        msg.add_reaction('⏯️'),
-        msg.add_reaction('⏭️'),
-        msg.add_reaction('🔀')
-    )
-
-
-async def delete_message(msg: discord.Message):
-    await asyncio.sleep(5)
-    await msg.delete()
-
-
-def is_spotify_url(url):
-    return "open.spotify.com" in url or "spotify.com" in url
-
-
-def get_spotify_track_info(url):
-    track = sp.track(url)
-    title = track['name']
-    artist = track['artists'][0]['name']
-    return f"{title} {artist}"
-
-
-def is_spotify_playlist(url):
-    return "playlist" in url
-
-
-def is_spotify_album(url):
-    return "album" in url
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except discord.HTTPException:
+                pass
 
 
 class Music(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
         self.logger = settings.get_logger()
-        self._queue = []
-        self.queue_index = 0
-        self.is_playing = False
-        self.is_connected = False
-        self.voice_client: discord.VoiceClient = None
-        self.executor = ThreadPoolExecutor()
-        self.last_played_msg = None
-        self.me_id = self.client.user.id
-        self.inactivity_timer: threading.Timer = None
-        self.shuffle_enabled = False
-        self._original_queue = None  # Store original queue order before shuffle
+        self.players: dict[int, GuildPlayer] = {}
 
-    async def clear(self):
-        self.is_playing = False
-        self._queue = []
-        self.queue_index = 0
+    async def cog_unload(self):
+        for player in list(self.players.values()):
+            await player.destroy()
 
-    async def disconnect(self):
-        self.is_playing = False
-        self._queue = []
-        self.queue_index = 0
-        await self.voice_client.disconnect()
-        self.voice_client = None
+    def _get_player(self, guild: discord.Guild) -> GuildPlayer:
+        player = self.players.get(guild.id)
+        if player is None:
+            player = GuildPlayer(self.client, guild, on_destroy=lambda gid: self.players.pop(gid, None))
+            self.players[guild.id] = player
+        return player
 
-    def in_voice_channel(self):
-        return self.voice_client is not None
-
-    def exists_next_song_in_queue(self):
-        return self.queue_index + 1 < len(self._queue)
-
-    def not_me(self, member: discord.Member):
-        return member.id != self.client.user.id
-
-    def start_inactivity_timer(self, minutes: int):
-        if self.inactivity_timer:
-            self.inactivity_timer.cancel()
-        self.inactivity_timer = threading.Timer(
-            minutes * 60, self.run_disconnect_coroutine)
-        self.inactivity_timer.start()
-
-    def run_disconnect_coroutine(self):
-        asyncio.run_coroutine_threadsafe(self.disconnect(), self.client.loop)
-
-    def reset_inactivity_timer(self):
-        if self.inactivity_timer:
-            self.inactivity_timer.cancel()
-            self.inactivity_timer = None
-
-    def clean_queue(self):
-        # Remove the song if it is 3 places down the queue
-        if self.queue_index > 2:
-            self._queue.pop(self.queue_index - 3)
-            self.queue_index -= 1  # Adjust index to keep it in sync
-
-    def get_current_song_from_queue(self):
-        return self._queue[self.queue_index]['song']
-
-    def get_current_from_queue(self):
-        return self._queue[self.queue_index]
-
-    def get_previous_song(self):
-        return self._queue[
-            self.queue_index - 1]['song'] if len(self._queue) > 1 and self.queue_index >= 1 else None
-
-    def is_queue_empty(self):
-        return len(self._queue) == 0
-
-    def clear_queue_impl(self):
-        current_music = self.get_current_from_queue()
-        if self.queue_index >= 0:
-            self._queue = [current_music]
-            self.queue_index = 0
-        else:
-            self._queue = []
-            self.queue_index = 0
+    async def _active_player(self, itr: discord.Interaction) -> GuildPlayer | None:
+        """The guild's player if music is going, otherwise tell the user and return None."""
+        player = self.players.get(itr.guild_id)
+        if player is None or not player.tracks:
+            await _reply(itr, 'ℹ️ There are no songs in the queue ℹ️', ephemeral=True)
+            return None
+        return player
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
                                     after: discord.VoiceState):
-        # Check if disconnected from discord
-        if member == self.client.user and before.channel and not after.channel:
-            await self.clear()
-        if self.not_me(member) and before.channel is not None and after.channel != before.channel:
-            remaining_member = before.channel.members
-            if len(remaining_member) == 1 and remaining_member[0].id == self.me_id and self.voice_client.is_connected():
-                await self.disconnect()
-
-    @commands.Cog.listener()
-    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
-        if user != self.client.user:
-            # Next
-            channel = self.client.get_channel(reaction.message.channel.id)
-            if reaction.emoji == '⏭️':
-                await self.reaction_next(channel, reaction, user)
-            # Previous
-            elif reaction.emoji == '⏮️':
-                await self.reaction_previous(channel, reaction, user)
-            # Play/Pause
-            elif reaction.emoji == '⏯️':
-                await self.reaction_play_pause(channel, reaction, user)
-            # Shuffle
-            elif reaction.emoji == '🔀':
-                await self.reaction_shuffle(channel, reaction, user)
-
-    async def reaction_next(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
-        msg = None
-        if not self.in_voice_channel():
-            msg = await channel.send("❌ You need to be in a voice channel to you this command ❌")
-        elif not self.exists_next_song_in_queue():
-            msg = await channel.send("ℹ️ There is no next song in the queue. Replaying current song ℹ️")
-            self.voice_client.pause()
-            await self.play_music(reaction.message.channel.id, user)
-            self.reset_inactivity_timer()
-        else:
-            self.queue_index += 1
-            self.voice_client.pause()
-            played = await self.play_music(reaction.message.channel.id, user)
-            if not played:
-                msg = await channel.send('⚠️ There are no songs to be played in the queue ⚠️')
-            else:
-                self.clean_queue()
-                self.reset_inactivity_timer()
-        if msg:
-            await delete_message(msg)
-
-    async def reaction_previous(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
-        msg = None
-        if not self.voice_client:
-            msg = await channel.send("❌ You need to be in a voice channel to use this command ❌")
-        elif self.queue_index <= 0:
-            msg = await channel.send("ℹ️ There is no previous song in the queue. Replaying current song ℹ️")
-            self.voice_client.pause()
-            await self.play_music(reaction.message.channel.id, user)
-            self.reset_inactivity_timer()
-        else:
-            self.queue_index -= 1
-            self.voice_client.pause()
-            played = await self.play_music(reaction.message.channel.id, user)
-            if not played:
-                msg = await channel.send('⚠️ There are no songs to be played in the queue ⚠️')
-        if msg:
-            await delete_message(msg)
-
-    async def reaction_play_pause(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
-        msg = None
-        if not self.voice_client:
-            msg = await channel.send("⚠️ There is no audio to be paused at the moment ⚠️")
-        elif self.is_playing:
-            msg = await channel.send(f"⏯️ Audio Paused by {user.display_name}")
-            self.is_playing = False
-            self.voice_client.pause()
-            self.start_inactivity_timer(5)
-        else:
-            msg = await channel.send(f"⏯️ Audio Resumed by {user.display_name}")
-            self.is_playing = True
-            self.voice_client.resume()
-            self.reset_inactivity_timer()
-        await reaction.message.clear_reactions()
-        await add_reactions(reaction.message)
-        if msg:
-            await delete_message(msg)
-
-    async def reaction_shuffle(self, channel: discord.TextChannel, reaction: discord.Reaction, user: discord.User):
-        msg = None
-        if self.is_queue_empty():
-            msg = await channel.send("❌ The queue is empty ❌")
-        else:
-            self.shuffle_enabled = not self.shuffle_enabled
-
-            if self.shuffle_enabled:
-                # Save original queue order before shuffling
-                self._original_queue = self._queue.copy()
-                # Shuffle the remaining songs (everything after current)
-                if self.exists_next_song_in_queue():
-                    upcoming = self._queue[self.queue_index + 1:]
-                    shuffle(upcoming)
-                    self._queue[self.queue_index + 1:] = upcoming
-                    msg = await channel.send(f'🔀 Shuffle enabled by {user.display_name}')
-                else:
-                    msg = await channel.send(f'🔀 Shuffle enabled (no songs to shuffle) by {user.display_name}')
-            else:
-                # Restore original queue order
-                if self._original_queue:
-                    # Restore from saved position onwards
-                    self._queue[self.queue_index +
-                                1:] = self._original_queue[self.queue_index + 1:]
-                    self._original_queue = None
-                msg = await channel.send(f'➡️ Shuffle disabled by {user.display_name}')
-
-            await reaction.message.clear_reactions()
-            await add_reactions(reaction.message)
-
-        if msg:
-            await delete_message(msg)
-
-    async def join_voice_channel(self, text_channel, voice_channel):
-        """Join a voice channel
-
-        Args:
-            :param voice_channel: Channel to send messages to
-            :param text_channel: Channel to join
-        """
-        # Check if already connected to a channel
-        if self.voice_client is None or not self.voice_client.is_connected():
-            # Try to connect to the channel
-            self.voice_client = await voice_channel.connect()
-            if self.voice_client is None:
-                channel = self.client.get_channel(text_channel)
-                await channel.send('⚠️ Could not connect to the channel ⚠️')
-        else:
-            # Move to channel
-            await self.voice_client.move_to(voice_channel)
-
-    async def pause(self, itr: discord.Interaction):
-        if not self.voice_client:
-            await itr.response.send_message('❌ There is no audio playing at the moment ❌')
-        elif self.is_playing:
-            self.is_playing = False
-            self.voice_client.pause()
-
-    async def play_next(self, user: discord.User, force: bool = False):
-        """Plays the next song asynchronously"""
-
-        if not self.is_playing and not force:
+        player = self.players.get(member.guild.id)
+        if player is None:
             return
-
-        if self.exists_next_song_in_queue():
-            self.is_playing = True
-            self.queue_index += 1
-
-            song = self.get_current_song_from_queue()
-            message = create_playing_embed("▶️ Now playing", user, song)
-
-            channel = self.client.get_channel(self.last_played_msg.channel.id)
-
-            # Delete the last message asynchronously
-            if self.last_played_msg:
-                try:
-                    await self.last_played_msg.delete()
-                except Exception as e:
-                    print(f"Error deleting last message: {e}")
-
-            # Send new playing message
-            try:
-                self.last_played_msg = await channel.send(embed=message, silent=True)
-            except Exception as e:
-                print(f"Error sending playing message: {e}")
-
-            # Add reactions asynchronously
-            try:
-                await add_reactions(self.last_played_msg)
-            except Exception as e:
-                print(f"Error adding reactions: {e}")
-
-            self.clean_queue()
-            # Play next song
-            self.play_audio(user, song)
-
-        else:
-            self.queue_index += 1
-            self.is_playing = False
-
-    async def _sp_fetch_playlist_page(self, playlist_id: str, offset: int, limit: int = 100, market: str = "PT"):
-        loop = asyncio.get_event_loop()
-
-        def run():
-            # Only the fields we need = faster + smaller payload
-            return sp.playlist_items(
-                playlist_id, market=market, limit=limit, offset=offset,
-                fields="items(track(name,artists(name))),total,next"
-            )
-
-        return await loop.run_in_executor(self.executor, run)
-
-    async def _sp_fetch_album_page(self, album_id: str, offset: int, limit: int = 50, market: str = "PT"):
-        loop = asyncio.get_event_loop()
-
-        def run():
-            return sp.album_tracks(
-                album_id, market=market, limit=limit, offset=offset
-            )
-
-        return await loop.run_in_executor(self.executor, run)
-
-    async def _yt_url_from_query(self, query: str) -> str | None:
-        """Use your existing search_youtube() to get a single watch URL."""
-        res = await self.search_youtube(query)
-        return res[0] if res else None
-
-    async def enqueue_spotify_playlist_progressive(self, url: str, user_channel, channel_to_notify,
-                                                   shuffle_music: bool = False) -> int:
-        """
-        Enqueue first Spotify track now (mapped to YouTube), then resolve the rest in the background.
-        Works for both playlist and album URLs.
-        """
-        is_playlist = is_spotify_playlist(url)
-        is_album = is_spotify_album(url)
-
-        if not (is_playlist or is_album):
-            return 0
-
-        # ---- 1) Fetch first track only
-        if is_playlist:
-            pid = _get_sp_playlist_id(url)
-            head = await self._sp_fetch_playlist_page(pid, offset=0, limit=1)
-            items = head.get("items") or []
-            if not items or not items[0].get("track"):
-                await channel_to_notify.send("❌ Could not read this Spotify playlist ❌")
-                return 0
-            t0 = items[0]["track"]
-        else:
-            aid = _get_sp_album_id(url)
-            head = await self._sp_fetch_album_page(aid, offset=0, limit=1)
-            items = head.get("items") or []
-            if not items:
-                await channel_to_notify.send("❌ Could not read this Spotify album ❌")
-                return 0
-            t0 = items[0]
-
-        q0 = f'{t0["name"]} {t0["artists"][0]["name"]}'
-        yt0 = await self._yt_url_from_query(q0)
-        if not yt0:
-            await channel_to_notify.send(f"❌ Could not find a YouTube match for **{q0}** ❌")
-            return 0
-
-        # Build first song (no pre-resolved source to avoid URL expiry)
-        vid0 = yt0.split(
-            "v=")[-1].split("&")[0] if "v=" in yt0 else yt0.rsplit("/", 1)[-1]
-        first_song = {
-            "link": yt0,
-            "thumbnail": _yt_thumb(vid0),
-            "original_url": yt0,
-            "source": None,  # resolve right before playback
-            "title": q0,  # use Spotify title/artist now; YouTube title will be resolved on play
-        }
-        self._queue.append({"song": first_song, "channel": user_channel})
-
-        # ---- 2) Background task: map the remaining tracks to YouTube and append
-        async def fetch_rest_spotify():
-            try:
-                added = 0
-                if is_playlist:
-                    total = head.get("total") or 0
-                    offset = 1
-                    page_size = 100
-                    while offset < total:
-                        page = await self._sp_fetch_playlist_page(pid, offset=offset, limit=page_size)
-                        entries = page.get("items") or []
-                        queries = [f'{it["track"]["name"]} {it["track"]["artists"][0]["name"]}'
-                                   for it in entries if it and it.get("track")]
-                        batch_songs = await self._resolve_queries_to_songs(queries, shuffle_music)
-                        for s in batch_songs:
-                            self._queue.append(
-                                {"song": s, "channel": user_channel})
-                        added += len(batch_songs)
-                        offset += page_size
-                else:
-                    total = head.get("total") or 0
-                    offset = 1
-                    page_size = 50
-                    while offset < total:
-                        page = await self._sp_fetch_album_page(aid, offset=offset, limit=page_size)
-                        entries = page.get("items") or []
-                        queries = [
-                            f'{it["name"]} {it["artists"][0]["name"]}' for it in entries if it]
-                        batch_songs = await self._resolve_queries_to_songs(queries, shuffle_music)
-                        for s in batch_songs:
-                            self._queue.append(
-                                {"song": s, "channel": user_channel})
-                        added += len(batch_songs)
-                        offset += page_size
-
-                if added:
-                    await channel_to_notify.send(f"📜 Added +{added} more from Spotify.")
-            except Exception as ex:
-                self.logger.exception(
-                    "Background Spotify mapping failed: %s", ex)
-
-        self.client.loop.create_task(fetch_rest_spotify())
-        return 1
-
-    async def _resolve_queries_to_songs(self, queries: list[str], shuffle_music: bool) -> list[dict]:
-        """Map a list of 'title artist' queries to song dicts using your YouTube search, with modest concurrency."""
-        # Concurrency limiter to be nice to YouTube and your host
-        sem = asyncio.Semaphore(6)
-
-        async def process(q: str) -> dict | None:
-            async with sem:
-                try:
-                    yt_url = await self._yt_url_from_query(q)
-                    if not yt_url:
-                        return None
-                    vid = yt_url.split(
-                        "v=")[-1].split("&")[0] if "v=" in yt_url else yt_url.rsplit("/", 1)[-1]
-                    return {
-                        "link": yt_url,
-                        "thumbnail": _yt_thumb(vid),
-                        "original_url": yt_url,
-                        "source": None,  # resolve at play time
-                        "title": q,  # keep Spotify title/artist label; avoids extra extraction per item
-                    }
-                except Exception as e:
-                    self.logger.warning("Failed mapping '%s': %s", q, e)
-                    return None
-
-        # Process in chunks to avoid giant gather on huge playlists
-        out: list[dict] = []
-        CHUNK = 25
-        for i in range(0, len(queries), CHUNK):
-            chunk = queries[i:i + CHUNK]
-            results = await asyncio.gather(*(process(q) for q in chunk))
-            items = [r for r in results if r]
-            if shuffle_music:
-                shuffle(items)
-            out.extend(items)
-        return out
-
-    async def resolve_stream(self, watch_url: str) -> str | None:
-        loop = asyncio.get_event_loop()
-
-        def run():
-            from yt_dlp import YoutubeDL
-            with YoutubeDL({**ytdl_format_options, "noplaylist": True, "format": "bestaudio/best"}) as yt:
-                return yt.extract_info(watch_url, download=False)
-
-        try:
-            info = await loop.run_in_executor(self.executor, run)
-        except (DownloadError, ExtractorError) as e:
-            error_msg = str(e)
-            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-                self.logger.warning(f"YouTube bot verification required for {watch_url}")
-            else:
-                self.logger.warning(f"resolve_stream failed: {e}")
-            return None
-        except Exception as e:
-            self.logger.warning(f"resolve_stream failed: {e}")
-            return None
-        if not info:
-            return None
-        # Try top-level url, else pick a format
-        fmts = info.get("formats") or []
-        if info.get("url"):
-            return info["url"]
-        # fall back to any audio-only format
-        audio_only = [f for f in fmts if f.get(
-            "vcodec") == "none" and f.get("acodec") not in (None, "none")]
-        if audio_only:
-            best = max(audio_only, key=lambda f: (
-                f.get("abr") or 0, f.get("tbr") or 0))
-            return best.get("url")
-        return None
-
-    async def prefetch_next_source(self):
-        """Resolve the next track's stream in advance to reduce start-up lag."""
-        if not self.exists_next_song_in_queue():
+        # The bot was disconnected (kicked, /leave, channel deleted...)
+        if member.id == self.client.user.id and before.channel and not after.channel:
+            await player.destroy()
             return
-        try:
-            nxt = self._queue[self.queue_index + 1]['song']
-        except Exception:
-            return
-        if nxt.get('source'):
-            return
-        try:
-            src = await self.resolve_stream(nxt['original_url'])
-            if src:
-                nxt['source'] = src
-        except Exception as exc:
-            self.logger.warning("Prefetch failed for %s: %s",
-                                nxt.get('original_url'), exc)
-
-    def play_audio(self, user, song):
-        def play_next_callback(e):
-            asyncio.run_coroutine_threadsafe(
-                self.play_next(user), self.client.loop)
-
-        async def play_audio_thread():
-            source_url = song['source']
-            if source_url is None:
-                source_url = await self.resolve_stream(song['original_url'])
-                if not source_url:
-                    self.logger.warning(
-                        "Could not resolve stream for %s", song['original_url'])
-                    self.is_playing = False
-                    await self.play_next(user, force=True)  # skip broken track
-                    return
-            # remember resolved URL so replays or requeues avoid re-fetching
-            song['source'] = source_url
-            try:
-                self.voice_client.play(discord.PCMVolumeTransformer(
-                    discord.FFmpegPCMAudio(source_url, **ffmpeg_options), volume=0.5
-                ), after=play_next_callback)
-            except Exception as exc:
-                self.logger.exception("Failed to start playback: %s", exc)
-                self.is_playing = False
-                await self.play_next(user, force=True)
-                return
-
-            # fire-and-forget prefetch of the upcoming track (if any)
-            self.client.loop.create_task(self.prefetch_next_source())
-
-        self.client.loop.create_task(play_audio_thread())
-
-    async def play_music(self, channel_id, user):
-        """Plays a song
-
-        Args:
-            channel_id (_type_): Channel where to send messages to
-            user (_type_): User who played the song
-
-        Returns:
-            _type_: _description_
-        """
-        if self.queue_index < len(self._queue):
-            self.is_playing = True
-            channel = self.client.get_channel(channel_id)
-            await self.join_voice_channel(channel, self._queue[self.queue_index]['channel'])
-            song = self.get_current_song_from_queue()
-
-            if self.last_played_msg:
-                await self.last_played_msg.delete()
-
-            embed = create_playing_embed("▶️ Now playing", user, song)
-            msg = await channel.send(embed=embed, silent=True)
-            self.last_played_msg = msg
-            await add_reactions(msg)
-
-            self.play_audio(user, song)
-            return True
-        else:
-            self.queue_index += 1
-            self.is_playing = False
-            return False
+        # Everyone left the bot's channel
+        voice = player.voice
+        if voice and voice.channel and before.channel == voice.channel != after.channel:
+            if not any(not m.bot for m in voice.channel.members):
+                await player.destroy()
 
     @app_commands.command(name='join', description="join vc")
     async def join(self, itr: discord.Interaction):
-        """Join your voice channel
-
-        Args:
-            itr (discord.Interaction): Discord interaction
-        """
-        if itr.user.voice:
-            user_channel = itr.user.voice.channel
-            await self.join_voice_channel(itr, user_channel)
-            await itr.response.send_message(f'🎉 DouraBot has joined {user_channel} 🎉')
-        else:
+        if not itr.user.voice:
             await itr.response.send_message('⚠️ You need to be connected to a voice channel ⚠️')
+            return
+        await itr.response.defer()
+        player = self._get_player(itr.guild)
+        player.text_channel = itr.channel
+        try:
+            await player.connect(itr.user.voice.channel)
+        except Exception as e:
+            self.logger.exception('Music: could not join voice')
+            await _reply(itr, f'⚠️ Could not connect to the channel: {e} ⚠️')
+            await player.destroy()
+            return
+        await _reply(itr, f'🎉 DouraBot has joined {itr.user.voice.channel} 🎉')
 
     @app_commands.command(name='leave', description="leave voice channel")
     async def leave(self, itr: discord.Interaction):
-        """Leave your voice channel
-
-        Args:
-            itr (discord.Interaction): Discord interaction
-        """
-        if self.in_voice_channel():
-            await self.disconnect()
-            self.voice_client = None
-            await itr.response.send_message('ℹ️ **DouraBot** has left the voice channel ℹ️')
-        else:
+        player = self.players.get(itr.guild_id)
+        if player is None:
             await itr.response.send_message('ℹ️ **DouraBot** is not in a voice channel ℹ️')
+            return
+        await player.destroy()
+        await itr.response.send_message('ℹ️ **DouraBot** has left the voice channel ℹ️')
 
-    async def _ydl_flat(self, url: str, playlist_items: str | None = None):
-        loop = asyncio.get_event_loop()
-
-        def run():
-            opts = {
-                **ytdl_format_options,
-                "extract_flat": "in_playlist",  # <-- the speedup
-                "noplaylist": False,
-                "skip_download": True,
-                "quiet": True,
-                "no_warnings": True,
-            }
-            if playlist_items:
-                opts["playlist_items"] = playlist_items  # e.g., "1" or "2-"
-            from yt_dlp import YoutubeDL
-            with YoutubeDL(opts) as yt:
-                return yt.extract_info(url, download=False)
-
-        try:
-            return await loop.run_in_executor(self.executor, run)
-        except (DownloadError, ExtractorError) as e:
-            error_msg = str(e)
-            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-                self.logger.error(f"_ydl_flat: YouTube bot verification required for {url}")
-            else:
-                self.logger.error(f"_ydl_flat error: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"_ydl_flat error: {e}")
-            return None
-
-    async def enqueue_playlist_progressive(self, playlist_url: str, user_channel,
-                                           channel_to_notify: discord.abc.Messageable,
-                                           shuffle_music: bool = False) -> int:
-        """Enqueue first track now; fetch remaining items in the background."""
-        # 1) Get only the first playlist entry (flat, instant)
-        head = await self._ydl_flat(playlist_url, playlist_items="1")
-        if not head or not head.get("entries"):
-            await channel_to_notify.send("❌ Could not read this playlist ❌")
-            return 0
-
-        first = head["entries"][0]
-        vid = first.get("id")
-        link = first.get("webpage_url") or first.get("url")
-        if not (link and link.startswith("http")):
-            link = _yt_watch_url(vid) if vid else playlist_url
-
-        first_song = {
-            "link": link,
-            "thumbnail": _pick_thumbnail(first) or _yt_thumb(vid or ""),
-            "original_url": link,
-            # resolve right before playback (your play_audio already does this)
-            "source": None,
-            "title": first.get("title"),
-        }
-        self._queue.append({"song": first_song, "channel": user_channel})
-        added_count = 1
-
-        # 2) Background task: fetch the rest ("2-" means from 2 to end) and append
-        async def fetch_rest():
-            try:
-                rest = await self._ydl_flat(playlist_url, playlist_items="2-")
-                entries = (rest or {}).get("entries") or []
-                items = []
-                for e in entries:
-                    if not e:
-                        continue
-                    vid2 = e.get("id")
-                    l2 = e.get("webpage_url") or e.get("url")
-                    if not (l2 and l2.startswith("http")):
-                        l2 = _yt_watch_url(vid2) if vid2 else playlist_url
-                    items.append({
-                        "link": l2,
-                        "thumbnail": _pick_thumbnail(e) or _yt_thumb(vid2 or ""),
-                        "original_url": l2,
-                        "source": None,  # resolve later
-                        "title": e.get("title"),
-                    })
-
-                if shuffle_music:
-                    from random import shuffle as _shuffle
-                    _shuffle(items)
-
-                # Extend queue on the event loop
-                for s in items:
-                    self._queue.append({"song": s, "channel": user_channel})
-
-                if items:
-                    await channel_to_notify.send(
-                        f"📜 Added +{len(items)} more from the playlist (total now {len(items) + 1}).")
-            except Exception as ex:
-                self.logger.exception(
-                    "Background playlist fetch failed: %s", ex)
-
-        self.client.loop.create_task(fetch_rest())
-        return added_count
-
-    async def search_youtube(self, q: str):
-        if "youtube.com/" in q or "youtu.be/" in q or "playlist?list=" in q:
-            return [q]
-        loop = asyncio.get_event_loop()
-
-        def run():
-            from yt_dlp import YoutubeDL
-            with YoutubeDL({"quiet": True, "noplaylist": True}) as yt:
-                return yt.extract_info(f"ytsearch1:{q}", download=False)
-
-        try:
-            info = await loop.run_in_executor(self.executor, run)
-        except (DownloadError, ExtractorError) as e:
-            error_msg = str(e)
-            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-                self.logger.error(f"search_youtube: YouTube bot verification required for query '{q}'")
-            else:
-                self.logger.error(f"search_youtube error: {e}")
-            return []
-        except Exception as e:
-            self.logger.error(f"search_youtube error: {e}")
-            return []
-        e = (info.get("entries") or [None])[0] if info else None
-        return [e.get("webpage_url")] if e else []
-
-    async def extract_youtube(self, url: str):
-        loop = asyncio.get_event_loop()
-
-        def run_fast_or_single():
-            # Treat pure playlist URLs as playlists; watch URLs stay single
-            is_playlist = ("playlist?list=" in url) or (
-                "list=" in url and "watch?v=" not in url)
-            opts = FAST_PLAYLIST_OPTS if is_playlist else SINGLE_OPTS
-            from yt_dlp import YoutubeDL
-            with YoutubeDL(opts) as yt:
-                return yt.extract_info(url, download=False)
-
-        try:
-            info = await loop.run_in_executor(self.executor, run_fast_or_single)
-        except (DownloadError, ExtractorError) as e:
-            error_msg = str(e)
-            if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-                self.logger.error(f"extract_youtube: YouTube bot verification required for {url}")
-            else:
-                self.logger.error(f"Error extracting YouTube info: {e}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error extracting YouTube info: {e}")
-            return None
-        if not info:
-            return None
-
-        # Playlist: flat entries — super fast; defer stream resolution
-        if "entries" in info or info.get("_type") == "playlist":
-            items = []
-            for e in info.get("entries") or []:
-                if not e:
-                    continue
-                # Flat entries may give id/ie_key; build a stable watch URL
-                page_url = e.get("webpage_url") or e.get("url")
-                if page_url and page_url.startswith("http"):
-                    link = page_url
-                else:
-                    vid = e.get("id") or page_url
-                    link = f"https://www.youtube.com/watch?v={vid}"
-                items.append({
-                    "link": link,
-                    "thumbnail": _pick_thumbnail(e),
-                    "original_url": link,
-                    "source": None,  # resolve later (right before play)
-                    "title": e.get("title"),
-                })
-            return items or None
-
-        # Single video: resolve a playable URL now
-        v = info
-        stream = v.get("url") or _pick_best_stream(v)
-        if not stream:
-            # fallback: try "best"
-            def run_best():
-                from yt_dlp import YoutubeDL
-                with YoutubeDL({**SINGLE_OPTS, "format": "best"}) as yt:
-                    return yt.extract_info(v.get("webpage_url") or url, download=False)
-
-            alt = await loop.run_in_executor(self.executor, run_best)
-            if alt:
-                stream = alt.get("url") or _pick_best_stream(alt)
-                if stream:
-                    v = alt
-        if not stream:
-            self.logger.warning("No playable stream found")
-            return None
-
-        return [{
-            "link": v.get("webpage_url") or url,
-            "thumbnail": _pick_thumbnail(v),
-            "original_url": v.get("original_url") or v.get("webpage_url") or url,
-            "source": stream,
-            "title": v.get("title"),
-        }]
-
-    @app_commands.command(name='play', description="play a song or playlist")
+    @app_commands.command(name='play', description="play a song or playlist (YouTube or Spotify)")
+    @app_commands.describe(search='Song name, YouTube link or Spotify track/album/playlist link',
+                           shuffle_music='Shuffle the songs before adding them')
     async def play(self, itr: discord.Interaction, search: str = None, shuffle_music: bool = False):
-        """Plays a requested song or playlist (YouTube/Spotify).
-        Progressive mode: starts first track immediately and fetches the rest in background.
-        """
+        if not itr.user.voice:
+            await itr.response.send_message('⚠️ You need to be connected to a voice channel ⚠️')
+            return
         await itr.response.defer()
-        channel = itr.channel
         self.logger.info(f'User {itr.user.display_name} called play/{search}')
 
+        player = self._get_player(itr.guild)
+        player.text_channel = itr.channel
+
+        # No search: resume
+        if search is None:
+            if player.is_paused:
+                player.toggle_pause()
+                await player.update_now_playing()
+                await _reply(itr, '▶️ Resumed', silent=True, delete_after=5)
+            elif not player.upcoming:
+                await _reply(itr, '❌ There are no songs to be played in the queue ❌')
+            else:
+                await _reply(itr, '▶️ Already playing', silent=True, delete_after=5)
+            return
+
         try:
-            # must check BEFORE using itr.user.voice.channel
-            if not itr.user.voice:
-                await itr.followup.send('⚠️ You need to be connected to a voice channel ⚠️')
-                return
-            user_channel = itr.user.voice.channel
+            tracks = await music_sources.search(search, itr.user)
+        except SourceError as e:
+            self.logger.warning(f'Music: {search!r} failed: {e}')
+            await _reply(itr, f'❌ {e} ❌')
+            if not player.tracks:
+                await player.destroy()
+            return
 
-            # No search: (re)play from queue or resume
-            if search is None:
-                if self.is_queue_empty():
-                    await itr.followup.send('❌ There are no songs to be played in the queue ❌')
-                    return
-                if not self.is_playing:
-                    played = await self.play_music(itr.channel.id, itr.user)
-                    if not played:
-                        await itr.followup.send('❌ There are no songs to be played in the queue ❌')
-                else:
-                    self.is_playing = True
-                    self.voice_client.resume()
-                return
-
-            # We have a search / URL
-            song_info: list[dict] = []
-            already_enqueued_first = False
-
-            # ---- Spotify (playlist/album progressive)
-            if is_spotify_playlist(search) or is_spotify_album(search):
-                self.logger.info(f'Spotify URL found: {search}')
-                added_now = await self.enqueue_spotify_playlist_progressive(
-                    search, user_channel, channel, shuffle_music
-                )
-                if added_now == 0:
-                    await itr.followup.send('❌ Could not read this Spotify URL ❌')
-                    return
-                # First track was already enqueued by the progressive method
-                song_info = [self._queue[-1]['song']]
-                already_enqueued_first = True
-
-            # ---- Spotify single track (map to YouTube)
-            elif is_spotify_url(search):
-                query = get_spotify_track_info(search)  # "Title Artist"
-                yt_urls = await self.search_youtube(query)
-                if not yt_urls:
-                    msg = await itr.followup.send('❌ Could not find the song ❌')
-                    await delete_message(msg)
-                    return
-                url0 = yt_urls[0]
-                vid0 = url0.split(
-                    "v=")[-1].split("&")[0] if "v=" in url0 else url0.rsplit("/", 1)[-1]
-                song_info = [{
-                    "link": url0,
-                    "thumbnail": _yt_thumb(vid0),
-                    "original_url": url0,
-                    "source": None,  # resolve just-in-time at play
-                    "title": query,
-                }]
-
-            else:
-                # ---- YouTube: search or URL
-                search_results = await self.search_youtube(search)
-                self.logger.info(f'Youtube Search results: {search_results}')
-                if not search_results:
-                    msg = await itr.followup.send('❌ Could not find the song ❌')
-                    await delete_message(msg)
-                    return
-
-                yt_url = search_results[0]
-
-                # YouTube playlist → progressive
-                if _is_playlist_url(yt_url):
-                    added_now = await self.enqueue_playlist_progressive(
-                        yt_url, user_channel, channel, shuffle_music
-                    )
-                    if added_now == 0:
-                        await itr.followup.send('❌ Could not read this playlist ❌')
-                        return
-                    song_info = [self._queue[-1]['song']]
-                    already_enqueued_first = True
-
-                # Single YouTube video → extract now
-                else:
-                    song_info = await self.extract_youtube(yt_url)
-                    if not song_info:
-                        await itr.followup.send('❌ Could not play the song ❌')
-                        return
-
-            # ---- Add to queue (avoid double-add for progressive branches)
-            if shuffle_music:
-                from random import shuffle as _shuffle
-                _shuffle(song_info)
-
-            if not already_enqueued_first:
-                for s in song_info:
-                    self._queue.append({'song': s, 'channel': user_channel})
-
-            await channel.send(f'📜 Added {len(song_info)} song{"s" if len(song_info) != 1 else ""} to the queue 📜')
-
-            # ---- Start playback if idle
-            if not self.is_playing:
-                if self.voice_client and self.voice_client.is_paused():
-                    embed = create_playing_embed(
-                        "📜 Added to queue 📜", itr.user, song_info)
-                    msg2 = await itr.followup.send(embed=embed, silent=True)
-                    await delete_message(msg2)
-                else:
-                    tmp_msg = await itr.followup.send("▶️ Connected and playing...")
-                    await delete_message(tmp_msg)
-                    played = await self.play_music(itr.channel.id, itr.user)
-                    if not played:
-                        await itr.followup.send('❌ There are no songs to be played in the queue ❌')
-            else:
-                embed = create_playing_embed(
-                    "📜 Added to queue 📜", itr.user, song_info)
-                msg2 = await itr.followup.send(embed=embed, silent=True)
-                await delete_message(msg2)
-
+        try:
+            await player.connect(itr.user.voice.channel)
         except Exception as e:
-            self.logger.exception(f"Error in play command: {e}")
-            try:
-                await itr.followup.send('❌ An error occurred while processing your request. Please try again later. ❌', ephemeral=True)
-            except Exception:
-                self.logger.error("Could not send error message to user")
+            self.logger.exception('Music: could not join voice')
+            await _reply(itr, f'⚠️ Could not connect to the voice channel: {e} ⚠️')
+            await player.destroy()
+            return
 
-    def _queue_embed(self, page: int, page_size: int) -> discord.Embed:
-        """Build a paginated queue embed with current/previous headers."""
-        embed = discord.Embed(title="🎚️ Music queue 🎚️")
+        if shuffle_music:
+            from random import shuffle
+            shuffle(tracks)
+        was_idle = not player.is_busy
+        player.enqueue(tracks)
 
-        previous = self.get_previous_song()
-        current = self.get_current_song_from_queue()
-
-        if previous is not None:
-            embed.add_field(
-                name="PREVIOUS",
-                value=f'[{previous["title"]}]({previous["link"]})',
-                inline=False)
-
-        embed.add_field(
-            name="CURRENT",
-            value=f'[{current["title"]}]({current["link"]})',
-            inline=False)
-
-        upcoming = self._queue[self.queue_index + 1:]
-        total_upcoming = len(upcoming)
-        total_pages = max(1, (total_upcoming + page_size - 1) // page_size)
-        page = max(0, min(page, total_pages - 1))
-        start = page * page_size
-        end = start + page_size
-        slice_items = upcoming[start:end]
-
-        if slice_items:
-            song_list = [
-                f'{self.queue_index + 1 + start + i}. [{entry["song"]["title"]}]({entry["song"]["link"]})'
-                for i, entry in enumerate(slice_items)
-            ]
-            songs_text = "\n".join(song_list)
+        if len(tracks) == 1:
+            title = '▶️ Playing' if was_idle else f'📜 Added to queue (#{len(player.tracks) - 1})'
+            await _reply(itr, embed=track_embed(title, tracks[0]), silent=True,
+                                    delete_after=None if not was_idle else 10)
         else:
-            songs_text = "(no more songs queued)"
-
-        embed.add_field(name=f"PLAYING NEXT (page {page + 1}/{total_pages})",
-                        value=songs_text[:1021] +
-                        ("..." if len(songs_text) > 1021 else ""),
-                        inline=False)
-        return embed
-
-    class QueueView(discord.ui.View):
-        def __init__(self, cog: "Music", user: discord.User, page_size: int = 8):
-            super().__init__(timeout=120)
-            self.cog = cog
-            self.user = user
-            self.page_size = page_size
-            self.page = 0
-            self.total_pages = 1
-            self.update_buttons()
-
-        def update_buttons(self):
-            """Update button states based on current page."""
-            total_upcoming = len(self.cog._queue) - (self.cog.queue_index + 1)
-            self.total_pages = max(
-                1, (total_upcoming + self.page_size - 1) // self.page_size)
-            self.children[0].disabled = (self.page == 0)  # Prev
-            self.children[1].disabled = (
-                self.page == self.total_pages - 1)  # Next
-
-        async def update(self, interaction: discord.Interaction):
-            total_upcoming = len(self.cog._queue) - (self.cog.queue_index + 1)
-            total_pages = max(
-                1, (total_upcoming + self.page_size - 1) // self.page_size)
-            self.page = max(0, min(self.page, total_pages - 1))
-            self.total_pages = total_pages
-            self.update_buttons()
-            embed = self.cog._queue_embed(self.page, self.page_size)
-            await interaction.response.edit_message(embed=embed, view=self)
-
-        @discord.ui.button(label="Prev", style=discord.ButtonStyle.secondary)
-        async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.user.id:
-                await interaction.response.defer()
-                return
-            self.page -= 1
-            await self.update(interaction)
-
-        @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
-        async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.user.id:
-                await interaction.response.defer()
-                return
-            self.page += 1
-            await self.update(interaction)
-
-        async def on_timeout(self):
-            for child in self.children:
-                if isinstance(child, discord.ui.Button):
-                    child.disabled = True
+            await _reply(itr, f'📜 Added {len(tracks)} songs to the queue 📜', silent=True)
 
     @app_commands.command(name='queue', description="display the current queue")
     async def queue(self, itr: discord.Interaction):
-        """Display the current queue with pagination."""
         await itr.response.defer()
-
-        if self.is_queue_empty():
-            await itr.followup.send('ℹ️ There are no songs in the queue ℹ️', silent=True)
+        player = await self._active_player(itr)
+        if player is None:
             return
-
-        view = self.QueueView(self, itr.user)
-        embed = self._queue_embed(page=0, page_size=view.page_size)
-        view.update_buttons()
-        await itr.followup.send(embed=embed, view=view, silent=True)
+        view = QueueView(player, itr.user)
+        view.message = await _reply(itr, embed=view.embed(), view=view, silent=True)
 
     @app_commands.command(name='clear_queue', description="clear the current queue")
     async def clear_queue(self, itr: discord.Interaction):
-        """Clear the current queue
-
-        Args:
-            itr (discord.Interaction): Discord interaction
-        """
         await itr.response.defer()
-        self.clear_queue_impl()
-        msg = await itr.followup.send('🗑️ Queue cleared! 🗑️', silent=True)
-        await delete_message(msg)
+        player = await self._active_player(itr)
+        if player is None:
+            return
+        player.clear_upcoming()
+        await _reply(itr, '🗑️ Queue cleared! 🗑️', silent=True, delete_after=5)
 
     @app_commands.command(name='skip_to', description="skip to a specific song in the queue")
+    @app_commands.describe(index='Song number as shown in /queue')
     async def skip_to(self, itr: discord.Interaction, index: int):
-        """Skip to a specific song by queue index
-
-        Args:
-            itr (discord.Interaction): Discord interaction
-            index (int): The queue index to skip to (0-based, as shown in queue)
-        """
         await itr.response.defer()
-
-        if not self.voice_client:
-            await itr.followup.send("❌ Not connected to a voice channel ❌")
+        player = await self._active_player(itr)
+        if player is None:
             return
-
-        if self.is_queue_empty():
-            await itr.followup.send("❌ The queue is empty ❌")
+        if not 0 <= index < len(player.tracks):
+            await _reply(itr, f'❌ Invalid index. Must be between 0 and {len(player.tracks) - 1} ❌')
             return
-
-        # Validate index (0-based as shown in the queue)
-        if index < 0 or index >= len(self._queue):
-            await itr.followup.send(f"❌ Invalid index. Must be between 0 and {len(self._queue) - 1} ❌")
+        if index == player.index and player.is_busy:
+            await _reply(itr, 'ℹ️ That song is already playing ℹ️')
             return
-
-        if index == self.queue_index:
-            await itr.followup.send("ℹ️ That song is already playing ℹ️")
-            return
-
-        # Jump to the specified index
-        self.queue_index = index - 1
-        if self.voice_client.is_playing() or self.voice_client.is_paused():
-            # Stop triggers play_next callback which will increment queue_index and play
-            self.voice_client.stop()
-        else:
-            # Not currently playing, manually start at target index
-            self.queue_index = index
-            await self.play_music(itr.channel.id, itr.user)
-
-        msg = await itr.followup.send(f'⏭️ Skipped to song #{index}')
-        await delete_message(msg)
+        player.jump(index)
+        await _reply(itr, f'⏭️ Skipped to song #{index}: **{player.tracks[index].title}**',
+                                delete_after=5)
 
     @app_commands.command(name='move_song', description="move a song to a different position in the queue")
+    @app_commands.describe(from_index='Current song number as shown in /queue',
+                           to_index='New song number')
     async def move_song(self, itr: discord.Interaction, from_index: int, to_index: int):
-        """Move a song from one position to another in the queue
-
-        Args:
-            itr (discord.Interaction): Discord interaction
-            from_index (int): The current position of the song (0-based, as shown in queue)
-            to_index (int): The desired position for the song (0-based, as shown in queue)
-        """
         await itr.response.defer()
-
-        if not self.voice_client:
-            await itr.followup.send("❌ Not connected to a voice channel ❌")
+        player = await self._active_player(itr)
+        if player is None:
             return
-
-        if self.is_queue_empty():
-            await itr.followup.send("❌ The queue is empty ❌")
+        last = len(player.tracks) - 1
+        if not 0 <= from_index <= last:
+            await _reply(itr, f'❌ Invalid source index. Must be between 0 and {last} ❌')
             return
-
-        # Validate indices (0-based as shown in the queue)
-        if from_index < 0 or from_index >= len(self._queue):
-            await itr.followup.send(f"❌ Invalid source index. Must be between 0 and {len(self._queue) - 1} ❌")
+        if not 0 <= to_index <= last:
+            await _reply(itr, f'❌ Invalid destination index. Must be between 0 and {last} ❌')
             return
-
-        if to_index < 0 or to_index >= len(self._queue):
-            await itr.followup.send(f"❌ Invalid destination index. Must be between 0 and {len(self._queue) - 1} ❌")
-            return
-
         if from_index == to_index:
-            await itr.followup.send("ℹ️ Source and destination indices are the same ℹ️")
+            await _reply(itr, 'ℹ️ Source and destination indices are the same ℹ️')
             return
-
-        # Cannot move the currently playing song
-        if from_index == self.queue_index:
-            await itr.followup.send("❌ Cannot move the currently playing song ❌")
+        if from_index == player.index:
+            await _reply(itr, '❌ Cannot move the currently playing song ❌')
             return
-
-        # Move the song
-        song = self._queue.pop(from_index)
-        self._queue.insert(to_index, song)
-
-        # Adjust queue_index if necessary
-        if from_index < self.queue_index < to_index:
-            self.queue_index -= 1
-        elif to_index <= self.queue_index < from_index:
-            self.queue_index += 1
-
-        song_title = song['song'][0]['title'] if isinstance(
-            song['song'], list) else song['song']['title']
-        msg = await itr.followup.send(f'🔄 Moved "{song_title}" from position {from_index} to {to_index}')
-        await delete_message(msg)
+        track = player.move(from_index, to_index)
+        await _reply(itr, f'🔄 Moved "{track.title}" from position {from_index} to {to_index}',
+                                delete_after=5)
 
 
 async def setup(client: commands.Bot) -> None:

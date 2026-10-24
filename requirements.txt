@@ -7,15 +7,16 @@ anyio==4.9.0
 async-timeout==5.0.1
 attrs==25.3.0
 Brotli==1.1.0
-certifi==2025.6.15
+certifi==2026.10.19
 cffi==1.16.0
 charset-normalizer==3.4.2
 db==0.1.1
-discord==2.3.2
-discord.py==2.6.0
+# 2.7+ with the voice extra (davey) is required: Discord rejects voice
+# connections without DAVE end-to-end encryption (close code 4017).
+discord.py[voice]==2.7.1
+davey==0.1.7
 emoji==2.14.1
 faceit==0.1.4
-ffmpeg==1.4
 frozenlist==1.7.0
 greenlet==3.1.1
 h11==0.16.0
@@ -51,5 +52,6 @@ typing_extensions==4.14.0
 urllib3==2.5.0
 websockets==15.0.1
 yarl==1.20.1
-yt-dlp==2025.12.8
+# `deno` bundles the JS runtime yt-dlp needs to solve YouTube's challenges.
+yt-dlp[default,deno]==2026.10.21
 cachetools==6.1.0
