@@ -27,6 +27,9 @@ class Client(commands.Bot):
         synced = await self.tree.sync(guild=settings.DISCORD_GUILD)
         self.logger.info(
             f'Synced {len(synced)} commands: {[s.name for s in synced]}')
+        # Commands are only registered per guild; drop stale global ones left by old versions
+        # (e.g. a /play with the old `song` parameter that shadows the real command).
+        await self.http.bulk_upsert_global_commands(self.application_id, [])
 
     async def setup_hook(self):
         skips = ['__init__']
